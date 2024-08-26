@@ -26,7 +26,7 @@
   :group 'magik)
 
 (defvar magik-pragma-topic-select-mode-map (make-keymap)
-  "Keymap for Topic selection in _pragma lines")
+  "Keymap for Topic selection in _pragma lines.")
 
 (define-key magik-pragma-topic-select-mode-map "y"  'magik-pragma-topic-select-mark)
 (define-key magik-pragma-topic-select-mode-map "n"  'magik-pragma-topic-select-unmark)
@@ -137,7 +137,7 @@ Returns nil if no change or the list (CURRENT-ELEM NEXT-ELEM) elements."
 	  (t nil))))
 
 (defun magik-pragma-if-match-replace-with-next (current next reverse)
-  "Removes the current match region and inserts the car of the NEXT element.
+  "Remove the current match region and insert the car of the NEXT element.
 The optional fourth item of CURRENT specifies a subexpression of the match.
 It says to replace just that subexpression instead of the whole match.
 The element follows that described in pragma-do-if-match."
@@ -197,7 +197,7 @@ This is used for searching for the end of a template.")
 The format follows that described in pragma-do-if-match.")
 
 (defun magik-pragma-deprecated-action-toggle (direction)
-  "toggle the current deprecated action option"
+  "Toggle the current deprecated action option."
   (goto-char (match-end 0))
   (magik-pragma-do-if-match magik-pragma-deprecated-action-list
 			    '(default  (looking-at "<.*>") magik-pragma-if-match-replace-with-next)
@@ -229,7 +229,7 @@ The format follows that described in pragma-do-if-match.")
 	   t))))
 
 (defun magik-pragma-insert-deprecated-template ()
-  "Inserts the template for deprecated methods."
+  "Insert the template for deprecated methods."
   (save-excursion
     (save-match-data
       (search-forward ")") ; find end of _pragma statement
@@ -251,7 +251,7 @@ The format follows that described in pragma-do-if-match.")
 	     (message "Use toggle keys, \\\\ and /, on 'Action' line to choose action."))))))
 
 (defun magik-pragma-remove-magik-deprecated-template ()
-  "Removes the template for deprecated methods.
+  "Remove the template for deprecated methods.
 If the text to be removed has been modifed then the user is asked whether they
 wish to remove it otherwise the template is removed silently."
   (save-excursion
@@ -470,13 +470,12 @@ q      - quit
   (run-hooks 'topic-select-mode-hook))
 
 (defun magik-pragma-topic-select-mark ()
-  "Mark a line to indicate that the process should be run"
+  "Mark a line to indicate that the process should be run."
   (interactive "*")
   (magik-pragma-topic-replace-char ">"))
 
 (defun magik-pragma-topic-replace-char (ch)
-  "Add the one character string to the beginning of the
-current line and move down a line.
+  "Add the one character string to the beginning of the current line and move down a line.
 Beep if not looking at \"[ >] (\""
   (if
       (not (looking-at "[ >] "))
@@ -487,18 +486,18 @@ Beep if not looking at \"[ >] (\""
     (forward-line)))
 
 (defun magik-pragma-topic-select-unmark ()
-  "Remove the mark from the current line"
+  "Remove the mark from the current line."
   (interactive "*")
   (magik-pragma-topic-replace-char " "))
 
 (defun magik-pragma-topic-select-quit ()
-  "quit from topic selection by restoring the window configuration"
+  "Quit from topic selection by restoring the window configuration."
   (interactive)
   (kill-buffer (current-buffer))
   (set-window-configuration magik-pragma-window-configuration))
 
 (defun magik-pragma-topic-select-select ()
-  "put the selected topics back into the pragma"
+  "Put the selected topics back into the pragma."
   (interactive)
   (goto-char (point-min))
   (let

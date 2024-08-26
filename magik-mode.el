@@ -871,8 +871,9 @@ you can use \\[isearch-forward-regexp] and use \\[isearch-ring-retreat] to recal
 
 (defun magik-goto-class-method-loop (search-str arg)
   "Loop over subsequent definitions.
-Adds string to `regexp-search-ring'. After wuiting this loop
-you can use \\[isearch-forward-regexp] and use M-p to recall this search."
+Adds SEARCH-STR to `regexp-search-ring'.  After quiting this loop
+you can use \\[isearch-forward-regexp] and use \\[isearch-ring-retreat] to recall this search.
+Argument ARG ..."
   ;;I would like to use the isearch functionality but I cannot work out
   ;;how to control isearch programmatically.
   (let ((continue-p t)
@@ -1032,7 +1033,7 @@ Optional argument GIS ..."
 	  (magik-gis-error-goto)))))
 
 (defun magik-perform-replace-no-set-mark (from to regexp-flag)
-  "like `perform-replace' but without setting the mark and without
+  "Like `perform-replace' but without setting the mark and without
 `query' or `delimited' flags."
   (let ((literal (not regexp-flag))
 	(search-function (if regexp-flag 're-search-forward 'search-forward)))
@@ -1175,7 +1176,7 @@ Otherwise, point is left where it is."
 (defalias 'transmit-method-to-magik 'magik-transmit-method)
 
 (defun magik-transmit-region (beg end)
-  "Send current region via a temp file to Magik in a shell, using load-file.
+  "Send current region via a temp file to Magik in a shell, using load_file.
 If this command is repeated before the previous file has been processed by Magik,
 another file shall be written."
   (interactive "r")
@@ -1257,7 +1258,7 @@ another file shall be written."
     gis))
 
 (defun magik-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag 'n' Drop GIS mode.
+  "Interface to Drag and Drop GIS mode.
 Called by `gis-drag-n-drop-load' when a Magik file is dropped.
 Argument FILENAME ..."
   (let ((process (barf-if-no-gis gis)))

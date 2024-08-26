@@ -249,7 +249,7 @@ Can be set using \\[cb-set-mode-line-cursor]."
 (put 'magik-cb-topics 'permanent-local t)
 
 (defvar magik-cb-was-one-window nil
-  "t if the cb was started from an unsplit-screen configuration.")
+  "If t, the cb was started from an unsplit-screen configuration.")
 
 (defvar magik-cb-was-started-from-top-half nil
   "If the screen was split this tells us whether the cb was invoked
@@ -303,10 +303,10 @@ This will stop the \"Loading documentation...\" message from hanging around.")
   "*Non-nil if the cb is connected to a live gis, rather than a static file.")
 
 (defvar magik-cb-mode-map (make-keymap)
-  "Keymap for the Class Browser")
+  "Keymap for the Class Browser.")
 
 (defvar magik-cb-menu nil
-  "Keymap for the CB menu bar")
+  "Keymap for the CB menu bar.")
 
 (easy-menu-define magik-cb-menu magik-cb-mode-map
   "Menu for CB mode."
@@ -414,7 +414,7 @@ This affects the way we might want to exit.
 Not used yet.")
 
 (defvar magik-cb2-was-one-window nil
-  "t if the cb2 was started from an unsplit-screen configuration.")
+  "If t. the cb2 was started from an unsplit-screen configuration.")
 
 (defvar magik-cb--ac-candidates nil
   "Internal return value from CB auto-complete process.")
@@ -627,7 +627,7 @@ Do a no-op if already in the cb."
 ;; to put the mode help.
 (defun magik-cb-mode ()
   "Major mode for running the Smallworld Class Browser.
-   Full help is available on the CB pull-down menu or by typing
+Full help is available on the CB pull-down menu or by typing
 
   M-x magik-cb-help
 
@@ -769,7 +769,7 @@ If `cb-process' is not nil, returns that irrespective of given BUFFER."
 			cb-list))))
 
 (defun magik-cb-gis-get-mf-socketname (gis-process)
-  "Returns from a GIS process its method_finder socketname interface."
+  "Return from a GIS process its method_finder socketname interface."
   ;; The gis-filter will set magik-cb--mf-socket-synchronised, which we trap here.
   (setq magik-cb--mf-socket-synchronised nil)
   (let ((buffer (buffer-name (process-buffer gis-process)))
@@ -784,7 +784,7 @@ If `cb-process' is not nil, returns that irrespective of given BUFFER."
 	    (sleep-for 0.01)))
 
       (if (or (not (zerop (% i 1000)))
-	      (not (y-or-n-p (format "The CB cannot start yet because the GIS process in %s is busy... Abort CB" buffer))))
+	      (not (y-or-n-p (format "The CB cannot start yet because the GIS process in %s is busy... Abort CB? " buffer))))
 	  (progn
 	    ;; either count i has not reached a multiple of 1000
 	    ;;     or conunt i is a multiple of 1000 but user has chosen to continue
@@ -821,8 +821,7 @@ It also detects the method_finder version and configures the following buffer lo
   `magik-cb-n-methods-str'
   `magik-cb-topic-pos'
   `magik-cb-topics'
-  `magik-cb-process'
-"
+  `magik-cb-process'"
   (setq buffer (get-buffer-create buffer)) ; get a real buffer object.
   (if (get-buffer-process buffer)
       (get-buffer-process buffer) ;returns running process
@@ -848,7 +847,7 @@ It also detects the method_finder version and configures the following buffer lo
 			 (goto-char (point-max))
 			 (insert "\n\n*** Can't start the Class Browser. ***\n The gis hasn't started a method_finder.\n Perhaps there was no '.mf' file next to your image file.\n")
 			 (ding) (ding) (ding)
-			 (error "cannot start CB using mf_connector")))))))
+			 (error "Cannot start CB using mf_connector")))))))
 	    (cb-file
 	     ;; otherwise start our own method_finder.
 	     (setq magik-cb-process
@@ -867,7 +866,7 @@ It also detects the method_finder version and configures the following buffer lo
 						   (number-to-string (point-max)))))
 	     (magik-cb-send-load cb-file))
 	    (t
-	     (error "cannot start CB")))
+	     (error "Cannot start CB")))
 
       (if magik-cb-process
 	  (progn
@@ -894,7 +893,7 @@ It also detects the method_finder version and configures the following buffer lo
       magik-cb-process)))
 
 (defun magik-cb-interactive-buffer ()
-  "Initialise an interactive Class Browser in current buffer"
+  "Initialise an interactive Class Browser in current buffer."
   ;;Ensure interaction buffers are empty
   (magik-cb-set-method-str "")
   (magik-cb-set-class-str "")
@@ -999,8 +998,7 @@ It also detects the method_finder version and configures the following buffer lo
   "Deal with a C-e or a C-u char coming back from the C by loading
 from \"/tmp\" into the main cb buffer.  Be careful to maintain the
 position in the listing.  Also extract the number-of-methods from
-the last line of the file, and put it in the global `magik-cb-n-methods-str'.
-"
+the last line of the file, and put it in the global `magik-cb-n-methods-str'."
   (let ((buf (process-buffer p))
 	(buffer-read-only nil)
 	(coding-system-for-read magik-cb-coding-system)
@@ -1020,12 +1018,11 @@ the last line of the file, and put it in the global `magik-cb-n-methods-str'.
     (magik-cb-redraw-modeline)))  ; for the method count.
 
 (defun magik-cb-force-query (p)
-  "Override the current modeline. The class name pattern is cleared
+  "Override the current modeline.  The class name pattern is cleared
 and the method name pattern is set to match the method name in
-cb-temp-method-name. Then a suitable query is sent to the method
+cb-temp-method-name.  Then a suitable query is sent to the method
 finder process to return the list of methods.
-None of the current topics or flags settings are overridden.
-"
+None of the current topics or flags settings are overridden."
   (magik-cb-set-class-str "")
   (magik-cb-set-method-str (concat "^" magik-cb-temp-method-name "$") )
   (magik-cb-send-modeline-and-pr)
@@ -1035,10 +1032,9 @@ None of the current topics or flags settings are overridden.
   "Deal with a C-c character coming back from the C by displaying
 the classes in \"*cb2*\".
 
-We assume that whatever lisp requested this info has made sure the
+We assume that whatever Lisp requested this info has made sure the
 buffer is being displayed in some window.  We just dump the data
-in \"*cb2*\" and note that \"*cb2*\" is now in family mode.
-"
+in \"*cb2*\" and note that \"*cb2*\" is now in family mode."
   (set-buffer (magik-cb2-buffer (process-buffer p)))
   (let ((buffer-read-only nil)
 	(coding-system-for-read magik-cb-coding-system))
@@ -1068,7 +1064,7 @@ separated by spaces."
 	(eq c ?\\)
 	(eq c ?%)
 	(save-match-data (string-match "^[a-zA-Z]:" jump-str))
-	(error "cb-goto-method (can't jump): %s" jump-str)))
+	(error "Can't jump to %s using cb-goto-method" jump-str)))
 
   ;;Now extract filename class and method from string separated by spaces
   ;;Assuming neither method nor class contains spaces
@@ -1456,10 +1452,11 @@ the STR to the method_finder."
   (magik-cb-print-curr-methods))
 
 (defun magik-cb-next-inheritance-setting ()
-  "Toggle the inheritance setting round the next setting.  The settings are:
-    local-only       - only display methods that are defined on the current classes.
-    inherit-not-\"obj\"   - display inherited methods too but not anything on object.
-    inherit-from-\"obj\"  - display methods on object too."
+  "Toggle the inheritance setting round the next setting.
+The settings are:
+ local-only            - only display methods that are defined on the current classes.
+ inherit-not-\"obj\"   - display inherited methods too but not anything on object.
+ inherit-from-\"obj\"  - display methods on object too."
   (interactive)
   (cond
    ((magik-cb-topic-on-p "inherit-from-\"object\"")
@@ -1808,10 +1805,8 @@ modelines of \"*cb*\" and \"*cb2*\" and put in a (') character."
 	(set-buffer-modified-p (buffer-modified-p))))))
 
 (defun magik-cb-modeline-flags ()
-  "Return a string that looks something like this:
-
-	   *b  a  *s  r  d  <inh>  F  T  2 dp rs   GIS
-"
+  "Return a string that look something like the next line.
+*b  a  *s  r  d  <inh>  F  T  2 dp rs   GIS"
   (let ((ans "")
 	s)
     (cl-loop for topic in '("basic" "advanced" "subclassable" "redefinable" "debug")
@@ -2178,7 +2173,7 @@ modelines of \"*cb*\" and \"*cb2*\" and put in a (') character."
 	(error "Can't find a line like: 'my_method  IN  my_class'")))))
 
 (defun magik-cb-jump-history-remove (jump-name)
-  "Removes the given JUMP-NAME from the magik-cb-jump-history list."
+  "Remove the given JUMP-NAME from the magik-cb-jump-history list."
   (remove (assoc jump-name magik-cb-jump-history) magik-cb-jump-history)
   )
 
@@ -2288,14 +2283,14 @@ compression or lazy re-draw or something."
 ;; to be sent.
 
 (defun magik-cb-send-tmp-file-name (file)
-  "Send tmp_file_name command to the method finder"
+  "Send tmp_file_name command to the method finder."
   (setq file (if magik-cb-quote-file-name
 		 (concat "'" file "'")
 	       file))
   (magik-cb-send-string "tmp_file_name " file "\n"))
 
 (defun magik-cb-send-load (file)
-  "Send load command to the method finder"
+  "Send load command to the method finder."
   (setq file (if magik-cb-quote-file-name
 		 (concat "'" file "'")
 	       file))
@@ -2402,8 +2397,7 @@ comments etc."
 	(kill-buffer (current-buffer))))))
 
 (defun magik-cb-temp-file-name (p)
-  "The file-name of the file that the method_finder uses
-for passing data back to the class browser."
+  "The file-name of the file that the method_finder should use for passing data back to the class browser."
   (let ((file (concat "mfm" (number-to-string (process-id p)))))
     (concat (getenv "TEMP") "\\" file)))
 

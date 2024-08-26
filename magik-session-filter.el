@@ -285,7 +285,7 @@ Search based keys:
 function must return the buffer of the file.
 
 method and class searching combine to a specific search
-search is a generic search string. If given with method and class
+search is a generic search string.  If given with method and class
 the string will be searched for after the method and class search has completed.
 
 line and column can be used together.

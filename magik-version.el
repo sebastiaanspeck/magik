@@ -103,10 +103,10 @@ This provides an alternative interface to a gis_version program."
   "Stores list of Smallworld directories added to PATH.")
 
 (defvar magik-version-mode-map (make-sparse-keymap)
-  "Keymap for selection of alternative GIS environments")
+  "Keymap for selection of alternative GIS environments.")
 
 (defvar magik-version-menu nil
-  "Keymap for the gis_version buffer menu bar")
+  "Keymap for the gis_version buffer menu bar.")
 
 (easy-menu-define magik-version-menu magik-version-mode-map
   "Menu for gis_version mode."
@@ -239,8 +239,8 @@ has more than one aliases file available."
   "Provide directory completion for finding Smallworld installations.
 Repeated TAB and \\[minibuffer-completion-help] still provide
 directory listing so users can navigate a directory structure looking
-for a Smallworld installation. Only when
-`gis-version-smallworld-gis-p' returns t for a given path will the
+for a Smallworld installation.
+Only when `gis-version-smallworld-gis-p' returns t for a given path will the
 path be considered to be a real Smallworld installation directory
 suitable for selection."
   (if (magik-version-smallworld-gis-p string)

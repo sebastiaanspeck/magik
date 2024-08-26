@@ -110,7 +110,8 @@
 	  (> (prefix-numeric-value arg) 0))))
 
 (defun magik-electric-hash (arg)
-  "insert the char, `#', and if this is the first `#' on the line and
+  "Insert the char, `#'.
+And if this is the first `#' on the line and
 the previous line starts with a `#' align with that."
   (interactive "*p")
   (self-insert-command arg)
@@ -138,7 +139,7 @@ the previous line starts with a `#' align with that."
   (magik-explicit-electric-space))
 
 (defun magik-explicit-electric-space ()
-  "insert magik programming templates"
+  "Insert magik programming templates."
   (interactive "*")
   (let*
       ((p (point))
@@ -175,7 +176,7 @@ the previous line starts with a `#' align with that."
       (error "There is no template for %s" str))))
 
 (defun magik-electric-space (arg &optional doit)
-  "expand magik keywords into programming templates"
+  "Expand magik keywords into programming templates."
   (interactive "*p")
   (cond
    ((save-excursion

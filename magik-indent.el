@@ -30,7 +30,7 @@
 
 ;;also defined in sw-electric.el
 (defcustom magik-indent-level 8
-  "*How much to indent each nested level"
+  "*How much to indent each nested level."
   :group 'magik
   :safe 'integerp
   :type 'integer)
@@ -107,8 +107,8 @@ global constant, `magik-transitions'.")
   "An association list of Magik keywords like \"_else\" and their corresponding endings (like \"_if\").")
 
 (defun magik--skip-blank-lines-backward ()
-  "Move back a line skipping white-space lines (lines with only spaces
-tabs and comments).  Return t if we succeed."
+  "Move back a line skipping white-space lines (lines with only spaces tabs and comments).
+Return t if we succeed."
   (if (eq (forward-line -1) -1)
       nil
     (while

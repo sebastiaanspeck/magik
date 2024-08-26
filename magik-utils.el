@@ -42,7 +42,7 @@ Signal an error if no gis is running."
       (error "There is no GIS process running in buffer '%s'" buffer)))
 
 (defun magik-utils-curr-word ()
-  "return the word (or part-word) before point as a string."
+  "Return the word (or part-word) before point as a string."
   (save-excursion
     (buffer-substring
      (point)
@@ -187,8 +187,7 @@ Used for determining a suitable BUFFER using the following interface:
 5. Use the buffer displayed in the some other frame,
    only PROMPT if more than one buffer in the other frames are displayed
    and only list those that are displayed in the other frames.
-6. Use DEFAULT value, or PROMPT if `magik-utils-by-default-prompt-buffer-p' is not nil.
-"
+6. Use DEFAULT value, or PROMPT if `magik-utils-by-default-prompt-buffer-p' is not nil."
   (let* ((prefix-fn (or prefix-fn
 			#'(lambda (arg mode predicate)
 			    (nth (1- arg)

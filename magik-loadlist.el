@@ -37,13 +37,13 @@ Intial ^ and final $ is automatically added in `loadlist-ignore'."
   :type  '(repeat regexp))
 
 (defvar magik-loadlist-mode-map (make-sparse-keymap)
-  "Keymap for Magik load_list.txt files")
+  "Keymap for Magik load_list.txt files.")
 
 (define-key magik-loadlist-mode-map (kbd "<f2> b")      'magik-loadlist-transmit)
 (define-key magik-loadlist-mode-map "\C-cr" 'magik-loadlist-refresh-contents)
 
 (defvar magik-loadlist-menu nil
-  "Keymap for the Magik loadlist buffer menu bar")
+  "Keymap for the Magik loadlist buffer menu bar.")
 
 (easy-menu-define magik-loadlist-menu magik-loadlist-mode-map
   "Menu for loadlist mode."
@@ -233,7 +233,7 @@ With a prefix arg accept all changes without prompting."
       "$\n"))))
 
 (defun magik-loadlist-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag 'n' Drop GIS mode.
+  "Interface to Drag and Drop GIS mode.
 Called by `gis-drag-n-drop-load' when a load_list.txt file is dropped."
   (let ((process (barf-if-no-gis gis))
 	(dir  (file-name-directory filename))

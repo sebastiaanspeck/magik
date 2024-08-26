@@ -35,10 +35,10 @@
   :type  'hook)
 
 (defvar magik-product-mode-map (make-sparse-keymap)
-  "Keymap for Magik product.def files")
+  "Keymap for Magik product.def files.")
 
 (defvar magik-product-f2-map (make-sparse-keymap)
-  "Keymap for the F2 function key in Magik product.def buffers")
+  "Keymap for the F2 function key in Magik product.def buffers.")
 
 (fset 'magik-product-f2-map   magik-product-f2-map)
 
@@ -48,7 +48,7 @@
 (define-key magik-product-f2-map    "r"    'magik-product-reinitialise)
 
 (defvar magik-product-menu nil
-  "Keymap for the Magik product.def buffer menu bar")
+  "Keymap for the Magik product.def buffer menu bar.")
 
 (easy-menu-define magik-product-menu magik-product-mode-map
   "Menu for Product mode."
@@ -163,7 +163,7 @@ You can customise Product Mode with the `product-mode-hook'.
     gis))
 
 (defun magik-product-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag 'n' Drop GIS mode.
+  "Interface to Drag and Drop GIS mode.
 Called by `gis-drag-n-drop-load' when a Product file is dropped."
   (let ((process (barf-if-no-gis gis)))
     (magik-product-transmit-add-product filename process)

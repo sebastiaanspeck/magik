@@ -93,7 +93,7 @@ If any function returns t, then the buffer is displayed."
   :type  'hook)
 
 (defvar magik-aliases-mode-map (make-sparse-keymap)
-  "Keymap for GIS aliases files")
+  "Keymap for GIS aliases files.")
 
 (define-key magik-aliases-mode-map (kbd "<S-return>") 'magik-aliases-run-program)
 (define-key magik-aliases-mode-map " "                'magik-aliases-n)
@@ -118,7 +118,7 @@ If any function returns t, then the buffer is displayed."
   "Syntax table in use in Aliases-mode buffers.")
 
 (defvar magik-aliases-definition-regexp "^\\([^#]\\S-+\\):\\s-*$"
-  "Regexp matching an alias definition")
+  "Regexp matching an alias definition.")
 
 ;; Imenu configuration
 (defvar magik-aliases-imenu-generic-expression
@@ -254,7 +254,7 @@ You can customise magik-aliases-mode with the magik-aliases-mode-hook.
   "Return t, to switch to the buffer that the GIS.exe process is running in.
 Since some entries in the aliases file do not start a Smallworld Magik GIS
 process we do not necessarily want to switch to the buffer running the
-process all the time. These are the following methods by which we control
+process all the time.  These are the following methods by which we control
 when the buffer is displayed:
   Hook: `aliases-switch-to-buffer-hooks'
        Each function in the hook is passed the name of the alias.
@@ -263,8 +263,7 @@ when the buffer is displayed:
        If the alias name matches the given regular expression the buffer
        is displayed.
   Variable: `aliases-switch-to-buffer'
-       If this is t then the buffer is displayed.
-"
+       If this is t then the buffer is displayed."
   (cond ((run-hook-with-args-until-success 'magik-aliases-switch-to-buffer-hooks alias)
 	 t)
 	((stringp magik-aliases-switch-to-buffer-regexp)
@@ -521,7 +520,7 @@ Returns nil if FILE cannot be expanded."
 
 ;;MSB configuration
 (defun magik-aliases-msb-configuration ()
-  "Adds Aliases files to msb menu, supposes that msb is already loaded."
+  "Add Aliases files to msb menu, supposes that msb is already loaded."
   (let* ((l (length msb-menu-cond))
 	 (last (nth (1- l) msb-menu-cond))
 	 (precdr (nthcdr (- l 2) msb-menu-cond)) ; cdr of this is last

@@ -57,7 +57,7 @@
 ;; Creating another template set
 ;; =============================
 ;; To create another template set you may need to write some function(s) that can distinguish
-;; between the templates. You will then add them to the beginning of magik-template-file-type-hook.
+;; between the templates.  You will then add them to the beginning of magik-template-file-type-hook.
 ;; You will also need to write a function that will return t when a new filename is created
 ;; that should use this template set.
 ;; For example, in magik-patch.el to create a template set called "Patch":
@@ -184,7 +184,7 @@ to use for magik-patch-file-type.")
 ;;Functions
 
 (defun magik-template-file (type &optional dir)
-  "Returns the path to the template of type TYPE. "
+  "Return the path to the template of type TYPE."
   (let ((file (cdr (assoc type magik-template-alist)))
 	(template-dir (or dir magik-template-dir)))
     (and file template-dir (concat (file-name-as-directory template-dir) file))))
@@ -197,7 +197,7 @@ to use for magik-patch-file-type.")
       (run-hook-with-args-until-success 'magik-template-file-type-hook (buffer-name)))))
 
 (defun magik-template-initialise (type)
-  "Inserts template text.
+  "Insert template text.
 Only the text in the template starting from a line matching ^# will be inserted."
   (if type   ;; to strip out the preamble from the template.
       (progn
@@ -219,8 +219,7 @@ is a buffer local variable and creation of a new variable kills all local variab
 The default value is always reset to nil by this function.
 
 The variable `magik-template-file-type-default' can be used by a user to predefine
-a template type to use for normal magik files.
-"
+a template type to use for normal magik files."
 
   (set-auto-mode t) ;ensure major mode is selected for the buffer but only using the file name
   (let* ((type (or magik-template-file-type

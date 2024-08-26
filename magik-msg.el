@@ -38,10 +38,10 @@
   :type  'hook)
 
 (defvar magik-msg-mode-map (make-sparse-keymap)
-  "Keymap for Magik Message files")
+  "Keymap for Magik Message files.")
 
 (defvar magik-msg-f2-map (make-sparse-keymap)
-  "Keymap for the F2 function key in Magik Message buffers")
+  "Keymap for the F2 function key in Magik Message buffers.")
 
 (fset 'magik-msg-f2-map   magik-msg-f2-map)
 
@@ -54,7 +54,7 @@
 (define-key magik-msg-f2-map    "m"    'magik-msg-mark-message)
 
 (defvar magik-msg-menu nil
-  "Keymap for the Magik Message buffer menu bar")
+  "Keymap for the Magik Message buffer menu bar.")
 
 (easy-menu-define magik-msg-menu magik-msg-mode-map
   "Menu for msg mode."
@@ -206,7 +206,7 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
     gis))
 
 (defun magik-msg-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag 'n' Drop GIS mode.
+  "Interface to Drag and Drop GIS mode.
 Called by `gis-drag-n-drop-load' when a Msg file is dropped."
   (let ((process (barf-if-no-gis gis)))
     (message "%s loaded in buffer %s." filename gis)
@@ -247,7 +247,7 @@ Called by `gis-drag-n-drop-load' when a Msg file is dropped."
 
 ;;MSB configuration
 (defun magik-msg-msb-configuration ()
-  "Adds Msg files to msb menu, supposes that msb is already loaded."
+  "Add Msg files to msb menu, supposes that msb is already loaded."
   (let* ((l (length msb-menu-cond))
 	 (last (nth (1- l) msb-menu-cond))
 	 (precdr (nthcdr (- l 2) msb-menu-cond)) ; cdr of this is last

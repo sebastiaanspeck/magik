@@ -75,7 +75,7 @@ Note that this command does handle a multiline _pragma statement."
     (save-match-data
       (let* ((pt (point))
 	     (end-bracket (search-forward ")" (save-excursion (forward-line 3) (point)) t))
-	     (start-bracket (and end-bracket (condition-case err
+	     (start-bracket (and end-bracket (condition-case nil
 						 (progn
 						   (backward-sexp)
 						   (point))

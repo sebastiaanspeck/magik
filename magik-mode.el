@@ -1327,7 +1327,7 @@ If PT is given, goto that char position."
     (skip-syntax-forward "-")
     (save-match-data
       (cond ((eq (following-char) ?\()
-	     (condition-case err
+	     (condition-case nil
 		 (progn
 		   (forward-sexp 1)
 		   (skip-syntax-forward "-")
@@ -1413,7 +1413,7 @@ If PT is given, goto that char position."
 	 (setq mode-line-buffer-identification
 	       (default-value 'mode-line-buffer-identification)))
 	(t
-	 (condition-case err
+	 (condition-case nil
 	     (setq magik-method-name (funcall magik-method-name-set-text-function
 					      (format "%-12s " (buffer-name))
 					      (car (magik-current-method-name)))

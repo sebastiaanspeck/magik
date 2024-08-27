@@ -267,7 +267,7 @@ particular line number."
 	((beg (match-beginning 0)))
       (find-file-other-window (substring str (match-end 0)))
       (or (zerop beg)
-	  (goto-line (string-to-number str))))))
+	  (forward-line (string-to-number str))))))
 
 (defun magik-session-filter-action-file-open (proc str)
   "Gis Filter Action interface for opening files in Emacs.
@@ -315,7 +315,7 @@ The behaviour is undefined if any search key and line or column are used."
 	    (goto-char (or start-pt (point-min))) ;;continue search from class.method?
 	    (if (search-forward (cdr val) nil t)
 		(goto-char (match-beginning 0)))))
-      (if (setq val (assq 'line alist))   (goto-line (string-to-number (cdr val))))
+      (if (setq val (assq 'line alist))   (forward-line (string-to-number (cdr val))))
       (if (setq val (assq 'column alist)) (move-to-column (string-to-number (cdr val)))))))
 
 (defun magik-session-filter-action-cb-mf (proc socketname)

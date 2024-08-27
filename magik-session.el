@@ -1188,7 +1188,7 @@ Argument ARG .."
 Argument ARG .."
   (interactive "*p")
   (magik-session--prepare-for-edit-cmd)
-  (delete-backward-char arg))
+  (delete-char arg))
 
 (defun magik-session-kill-line (arg)
   "Take a copy of a command before killing the line.

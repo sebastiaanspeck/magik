@@ -1553,7 +1553,7 @@ Optional argument ARG .."
 	(if (null arg)
 	    (not magik-session-drag-n-drop-mode)
 	  (> (prefix-numeric-value arg) 0)))
-  (add-hook 'find-file-hooks 'magik-session-drag-n-drop-load)
+  (add-hook 'find-file-hook 'magik-session-drag-n-drop-load)
   (if magik-session-drag-n-drop-mode
       (message "Magik 'Drag and Drop' file mode is on")
     (message "Magik 'Drag and Drop' file mode is off"))

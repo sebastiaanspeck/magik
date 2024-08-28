@@ -27,6 +27,8 @@
   (require 'magik-utils)
   (require 'magik-session))
 
+(require 'speedbar)
+
 (defgroup magik-msg nil
   "Customise Magik Messages group."
   :group 'magik

@@ -33,6 +33,8 @@
 
 (require 'compat)
 (require 'imenu)
+(require 'speedbar)
+
 (require 'magik-electric)
 (require 'magik-indent)
 (require 'magik-pragma)

@@ -259,7 +259,7 @@ a template type to use for normal magik files."
 ;; hand crafted hooks for other template sets.
 ;; A possible algorithm would be to cache each template and then
 ;; use compare-windows to identify a unique initial string for each template.
-(defun magik-template-file-type-p (buffer-name)
+(defun magik-template-file-type-p (_buffer-name)
   "Hook function that identifies `default' Magik files.
 
 Modify this function to return a suitable match for the various templates

@@ -460,7 +460,7 @@ It returns a list of the individual components that make up the COMMAND."
 	  (setcdr c nil)
 	  (car c)))))
 
-(defun magik-session-buffer-alist-prefix-function (arg mode predicate)
+(defun magik-session-buffer-alist-prefix-function (arg _mode predicate)
   "Process prefix keys using \\[gis] and return the corresponding buffer.
 ARG is the prefix key, MODE is the major mode to check, and PREDICATE
 is a function used to determine buffer validity."

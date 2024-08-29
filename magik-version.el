@@ -235,7 +235,7 @@ has more than one aliases file available."
   "Return t if path points to a Smallworld installation."
   (file-directory-p (concat (file-name-directory path) "config")))
 
-(defun magik-version-read-smallworld-gis-completion (string predicate flag)
+(defun magik-version-read-smallworld-gis-completion (string _predicate flag)
   "Provide directory completion for finding Smallworld installations.
 Repeated TAB and \\[minibuffer-completion-help] still provide
 directory listing so users can navigate a directory structure looking

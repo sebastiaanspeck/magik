@@ -136,7 +136,7 @@ Returns nil if no change or the list (CURRENT-ELEM NEXT-ELEM) elements."
 	   (list default-elem first-elem))
 	  (t nil))))
 
-(defun magik-pragma-if-match-replace-with-next (current next reverse)
+(defun magik-pragma-if-match-replace-with-next (current next _reverse)
   "Remove the current match region and insert the car of the NEXT element.
 The optional fourth item of CURRENT specifies a subexpression of the match.
 It says to replace just that subexpression instead of the whole match.
@@ -358,7 +358,7 @@ relative the current setting and available values."
 
   (magik-pragma-do-if-match magik-pragma-electric-toggle-list nil (eq direction 'backward)))
 
-(defun magik-pragma-if-match-insert-classify_level (current next reverse)
+(defun magik-pragma-if-match-insert-classify_level (_current _next reverse)
   "Insert the classify_level according to the current setting.
 Also adds a template in the comment section when the classify_level is set to deprecated.
 When the classify_level is changed from deprecrated then the template is removed.
@@ -378,7 +378,7 @@ if they wish to remove the contents of the depreacted template."
 	     (magik-pragma-remove-magik-deprecated-template))
 	    (t nil)))))
 
-(defun magik-pragma-if-match-insert-usage (current next reverse)
+(defun magik-pragma-if-match-insert-usage (_current _next reverse)
   "Insert the usage according to the current setting."
   ;;Ensure point stays immediately after = by searching for = and doing the replace inside save-excursion
   (search-forward "=")
@@ -402,7 +402,7 @@ if they wish to remove the contents of the depreacted template."
 (defvar magik-pragma-window-configuration nil
   "Window configuration to return to after topic selection mode.")
 
-(defun magik-pragma-if-match-do-the-electric-pragma-topics (current next reverse)
+(defun magik-pragma-if-match-do-the-electric-pragma-topics (_current _next _reverse)
   "Select pragma topics from a menu."
   (let* ((product-pragma-file (if (getenv "SMALLWORLD_GIS") (expand-file-name (concat (getenv "SMALLWORLD_GIS") "/data/doc/pragma_topics"))))
 	 topics pos)

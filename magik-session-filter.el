@@ -99,7 +99,7 @@ FUNCTION takes one argument, the string after the action character."
 				  (" " . "\C-a"))))))
 	    (magik-session-filter proc (substring str (1+ n))))))))
 
-(defun magik-session-filter-insert (buf proc n str)
+(defun magik-session-filter-insert (_buf proc n str)
   "Insert into BUF at the `process-mark' of PROC, N chars from STR.
 If N is nil insert the whole of STR.  We insert before all markers except the
  'comint-last-input-end' and the last command from magik-session-prev-cmds."
@@ -206,7 +206,7 @@ action's function setting."
 ;;; generic magik-session-filter code ends here.
 
 ;;; Set up filter action functions for the gis process
-(defun magik-session-filter-action-completion (proc str)
+(defun magik-session-filter-action-completion (_proc str)
   "Gis Filter Action interface for a magik symbol completion according to STR returned from Magik."
   (let ((ans (read str))
 	(curr-word-len (length (magik-utils-curr-word))))
@@ -243,7 +243,7 @@ action's function setting."
 	  (message "Finding completions...Done."))))))
 
 
-(defun magik-session-filter-action-deep-print (proc str)
+(defun magik-session-filter-action-deep-print (_proc str)
   "Gis Filter Action interface for a deep print action according to the STR back from magik."
   (let ((buffer (concat "*deep print*" (buffer-name (process-buffer proc)))))
     (pop-to-buffer buffer) ;;Buffer should always exist since the only USer interface is via deep-print.
@@ -255,7 +255,7 @@ action's function setting."
       (erase-buffer))
     (insert str)))
 
-(defun magik-session-filter-action-find-file (proc str)
+(defun magik-session-filter-action-find-file (_proc str)
   "(Deprecated) Gis Filter Action interface for `find-file'.
 Find a file and goto a particular line number
 STR is of the form 42:/bla/bla/foo.magik or
@@ -269,7 +269,7 @@ particular line number."
       (or (zerop beg)
 	  (forward-line (string-to-number str))))))
 
-(defun magik-session-filter-action-file-open (proc str)
+(defun magik-session-filter-action-file-open (_proc str)
   "Gis Filter Action interface for opening files in Emacs.
 STR consists of newline separated KEY=VALUE pairs.
 Recognised KEYs are:
@@ -318,15 +318,15 @@ The behaviour is undefined if any search key and line or column are used."
       (if (setq val (assq 'line alist))   (forward-line (string-to-number (cdr val))))
       (if (setq val (assq 'column alist)) (move-to-column (string-to-number (cdr val)))))))
 
-(defun magik-session-filter-action-cb-mf (proc socketname)
+(defun magik-session-filter-action-cb-mf (_proc socketname)
   "Magik has started a method_finder and let Emacs know what the socketname is."
   (setq magik-cb--mf-socket-synchronised socketname))
 
-(defun magik-session-filter-action-cb-goto-method (proc str)
+(defun magik-session-filter-action-cb-goto-method (_proc str)
   "GIS Filter Action interface for cb-goto-method."
   (magik-cb-goto-method str nil))
 
-(defun magik-session-filter-action-magik-session-prompt-set (proc str)
+(defun magik-session-filter-action-magik-session-prompt-set (_proc str)
   "Gis Filter Action for setting `magik-session-prompt' variable."
   (with-current-buffer (buffer-name (process-buffer proc))
     (setq magik-session-prompt str)

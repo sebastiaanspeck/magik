@@ -1123,7 +1123,7 @@ separated by spaces."
 ;;; S E N T I N E L
 ;; function to run when process changes state.
 
-(defun magik-cb-sentinel (proc msg)
+(defun magik-cb-sentinel (proc _msg)
   (let ((status (process-status proc))
 	(buf (process-buffer proc)))
     (if (and (or (eq status 'exit) (eq status 'signal))
@@ -1562,7 +1562,7 @@ be careful to preserve the position in \"*cb2*\"."
   "Name of the CB2 buffer."
   (get-buffer-create (concat "*cb2*" (magik-cb-gis-buffer buffer))))
 
-(defun magik-cb2-get-window (mode)
+(defun magik-cb2-get-window (_mode)
   "Set up a window for \"*cb2*\".
 Return nil if \"*cb2*\" already had a window and was in the right mode.
 If it didn't have a window, the buffer is re-filled from

@@ -114,7 +114,8 @@
   '(
     (nil "^\\(\\sw+\\)\\s-*\n\\(.\\|\n\\)*\nend\\s-*$" 1)
     )
-  "Imenu generic expression for Magik Message mode.  See `imenu-generic-expression'.")
+  "Imenu generic expression for Magik Message mode.
+See `imenu-generic-expression'.")
 
 ;; Font-lock configuration
 (defcustom magik-module-font-lock-keywords
@@ -264,7 +265,7 @@ a standalone module."
     gis))
 
 (defun magik-module-transmit-load-module (filename process)
-  "Load the module into the GIS process.
+  "Load the module FILENAME into the GIS PROCESS.
 If module definition is not known to the Magik GIS it is loaded as
 a standalone module."
   (let ((module (intern (concat "|" (magik-module-name) "|"))))
@@ -298,7 +299,7 @@ a standalone module."
     gis))
 
 (defun magik-module-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag and Drop GIS mode.
+  "Interface to Drag and Drop FILENAME in GIS mode.
 Called by `gis-drag-n-drop-load' when a Module file is dropped."
   (let ((process (barf-if-no-gis gis)))
     (magik-module-transmit-load-module filename process)

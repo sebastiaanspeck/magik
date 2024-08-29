@@ -79,7 +79,8 @@
     (nil "^:\\s$\\(\\S$+\\)\\s$" 1) ;; | | Quoted messages
     ("Groups" "^+\\s-+\\(\\sw+\\)" 1)
     )
-  "Imenu generic expression for Magik Message mode.  See `imenu-generic-expression'.")
+  "Imenu generic expression for Magik Message mode.
+See `imenu-generic-expression'.")
 
 ;; Font-lock configuration
 (defcustom magik-msg-font-lock-keywords
@@ -185,8 +186,9 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
     gis))
 
 (defun magik-msg-compile-module-messages (&optional gis)
-  "Compile all messages asociated with the module this buffer is assocaiated with in a GIS process.
-The GIS process used is either that given by BUF or the variable `gis-buffer'."
+  "Compile all messages for the module in this buffer using a GIS process.
+
+Use the GIS process given by GIS or the `gis-buffer' variable."
   (interactive)
   (let ((gis (magik-utils-get-buffer-mode gis
 					  'magik-session-mode
@@ -208,7 +210,7 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
     gis))
 
 (defun magik-msg-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag and Drop GIS mode.
+  "Interface to Drag and Drop FILENAME in GIS mode.
 Called by `gis-drag-n-drop-load' when a Msg file is dropped."
   (let ((process (barf-if-no-gis gis)))
     (message "%s loaded in buffer %s." filename gis)

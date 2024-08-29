@@ -418,7 +418,7 @@ the gis.  The frame and icon title strings will be modified according to
     (message "The current installation for this Emacs is now %s." stream)))
 
 (defun magik-version-select-internal ()
-  "Modify `process-environment' and `exec-path' for current version.
+  "Modify `process-environment' and variable `exec-path' for current version.
 Return (STREAM VERSION SMALLWORLD_GIS)."
   (if (< (point) magik-version-position)
       (error "No Environment at this point"))
@@ -443,7 +443,7 @@ Return (STREAM VERSION SMALLWORLD_GIS)."
     (list stream version smallworld-gis)))
 
 (defun magik-version-set-environment (smallworld-gis stream version)
-  "Modify the process and exec-path environment given stream and smallworld-gis path."
+  "Modify the process and variable `exec-path' environment given STREAM and SMALLWORLD-GIS path."
   (setenv "SMALLWORLD_GIS" smallworld-gis)
   (setenv "SW_STREAM" stream)
   (setenv "SW_VERSION" version))
@@ -484,8 +484,6 @@ by the current Smallworld version."
       (subst-char-in-string ?/ ?\\ new))))
 
 (defun magik-version-header-string ()
-  "Insert a string describing the gis_version status.
-Used before running a GIS process."
 
   (let (gis-version-script)
     (if (stringp magik-version-current)
@@ -498,6 +496,7 @@ Used before running a GIS process."
 	   (insert (format "\n** Can't find the currently selected product, %s.\n** (Attempting to run anyway).\n" magik-version-current)))
 	  (t
 	   (insert (format "Gis Environment: %s\n" magik-version-current))))))
+  "Insert a string describing the `gis_version` before running a GIS process."
 
 ;;; Package initialisation
 (if magik-version-mode-syntax-table

@@ -163,7 +163,7 @@ Optional PREDICATE is either a function or a variable which must not return nil.
 Optional SORT-FN overrides the default sort function, `string-lessp'.
 
 This function is provided mainly for the standardised sorting of GIS buffers.
-Since the introduction of having multiple GIS sessions with the 'key' being
+Since the introduction of having multiple GIS sessions with the `key' being
 the GIS buffer name, it is very useful to have a standardised sort of
 GIS buffers."
   (sort (magik-utils-buffer-mode-list mode predicate)

@@ -90,7 +90,7 @@
 (defvar magik-template-alist nil
   "Alist of types of template files.
 Each element is a cons cell:
-(TYPE . FILE)
+\(TYPE . FILE\)
 When you add to this alist to enable additional templates,
 you will also have to add an appropriate entry to
 magik-template-file-type-alist to make the user
@@ -120,10 +120,10 @@ a key in magik-template-alist.")
 
 (defvar magik-template-file-type-alist nil
   "Alist of valid Magik file types.
-This is used to give the User a choice of template to use when they do C-x C-f
+This is used to give the User a choice of template to use when they do `find-file'
 with a Magik file name but when the file does not exist yet.
 
-(LABEL . (FUNCTION . ((OPTION . KEY) ... )))
+\(LABEL . (FUNCTION . ((OPTION . KEY) ... ))\)
 where
 LABEL    is the string label used in the prompt to the user.
 FUNCTION is a function used to test the type of templates to use for the new file
@@ -260,7 +260,7 @@ a template type to use for normal magik files."
 ;; A possible algorithm would be to cache each template and then
 ;; use compare-windows to identify a unique initial string for each template.
 (defun magik-template-file-type-p (buffer-name)
-  "Hook function that identifies 'default' Magik files.
+  "Hook function that identifies `default' Magik files.
 
 Modify this function to return a suitable match for the various templates
 you have.

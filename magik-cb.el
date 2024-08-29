@@ -241,7 +241,7 @@ Can be set using \\[cb-set-mode-line-cursor]."
   "Alist storing CB buffer filename and number used for prefix key switching.")
 
 (defvar magik-cb-process nil
-  "'method finder' process.")
+  "`method finder' process.")
 (put 'magik-cb-process 'permanent-local t)
 
 (defvar magik-cb-topics nil
@@ -291,7 +291,7 @@ We don't rely on the state of the \"*cb2*\" buffer because it is only temporary.
 
 (defvar magik-cb-cursor-pos nil
   "Whether the CB modeline cursor is in the method or class part of the modeline.
-Takes the values 'method-name and 'class-name.")
+Takes the values `method-name' and `class-name'.")
 (put 'magik-cb-cursor-pos 'permanent-local t)
 
 (defvar magik-cb-pending-message nil
@@ -712,7 +712,7 @@ If `cb-process' is not nil, returns that irrespective of given BUFFER."
 	  (setcdr c nil)
 	  (car c)))))
 
-(defun magik-cb-buffer-alist-prefix-function (arg mode predicate)
+(defun magik-cb-buffer-alist-prefix-function (arg _mode predicate)
   "Function to process prefix keys when used with \\[cb]."
   (let (buf)
     (cond ((zerop arg) (set buf nil))
@@ -1053,7 +1053,7 @@ in \"*cb2*\" and note that \"*cb2*\" is now in family mode."
 	(set-window-point (get-buffer-window (current-buffer)) (point)))))
 
 (defun magik-cb-goto-method (jump-str other-window-p) ;; ??? %env% ??? unix filenames on NT etc.
-  "Deal with a C-f character coming back from the C by 'finding' the
+  "Deal with a C-f character coming back from the C by `finding' the
 method described in the string, JUMP-STR.
 
 JUMP-STR contains the filename, the methodname and the classname
@@ -1563,10 +1563,10 @@ be careful to preserve the position in \"*cb2*\"."
   (get-buffer-create (concat "*cb2*" (magik-cb-gis-buffer buffer))))
 
 (defun magik-cb2-get-window (mode)
-  "Set up a window for \"*cb2*\" and return nil if \"*cb2*\" already had a
-window and was in the right mode.  (If it didn't have a window, the
-buffer is re-filled from the cb global variables).  We also save
-some state for a clean exit."
+  "Set up a window for \"*cb2*\".
+Return nil if \"*cb2*\" already had a window and was in the right mode.
+If it didn't have a window, the buffer is re-filled from
+the cb global variables. We also save some state for a clean exit."
   (let* ((cb2 (magik-cb2-buffer)) ;actually always called from *cb2* buffer.
 	 (buf (magik-cb-buffer))
 	 (win (get-buffer-window cb2)))
@@ -1656,7 +1656,7 @@ some state for a clean exit."
   (magik-cb-redraw-modeline))
 
 (defun magik-cb-forward-char ()
-  "Do a forward-char in the mode-line."
+  "Do a `forward-char' in the mode-line."
   (interactive)
   (with-current-buffer (magik-cb-buffer)
     (if (eq magik-cb-cursor-pos 'method-name)
@@ -1672,7 +1672,7 @@ some state for a clean exit."
   (magik-cb-redraw-modeline))
 
 (defun magik-cb-backward-char ()
-  "Do a backward-char in the mode-line."
+  "Do a `backward-char' in the mode-line."
   (interactive)
   (with-current-buffer (magik-cb-buffer)
     (if (eq magik-cb-cursor-pos 'class-name)
@@ -1687,7 +1687,7 @@ some state for a clean exit."
   (magik-cb-redraw-modeline))
 
 (defun magik-cb-insert-command (arg)
-  "Do a self-insert-command into the mode-line and refresh the method display."
+  "Do a `self-insert-command' into the mode-line and refresh the method display."
   (interactive "p")
   (with-current-buffer (magik-cb-buffer)
     (save-excursion
@@ -1700,7 +1700,7 @@ some state for a clean exit."
     (magik-cb-send-modeline-and-pr)))
 
 (defun magik-cb-backward-delete-char (arg &optional killflag)
-  "Do a delete-char in the mode-line and refresh the method display."
+  "Do a `delete-char' in the mode-line and refresh the method display."
   (interactive "p\nP")
   (with-current-buffer (magik-cb-buffer)
     (save-excursion
@@ -1717,7 +1717,7 @@ some state for a clean exit."
     (magik-cb-send-modeline-and-pr)))
 
 (defun magik-cb-delete-char (arg &optional killflag)
-  "Do a delete-char in the mode-line and refresh the method display."
+  "Do a `delete-char' in the mode-line and refresh the method display."
   (interactive "p\nP")
   (with-current-buffer (magik-cb-buffer)
     (save-excursion
@@ -1735,7 +1735,7 @@ some state for a clean exit."
     (magik-cb-send-modeline-and-pr)))
 
 (defun magik-cb-kill-line (arg)
-  "Do a kill-line in the mode-line and refresh the method display."
+  "Do a `kill-line' in the mode-line and refresh the method display."
   (interactive "p")
   (with-current-buffer  (magik-cb-buffer)
     (save-excursion
@@ -1914,7 +1914,7 @@ modelines of \"*cb*\" and \"*cb2*\" and put in a (') character."
 	 (magik-cb-family (magik-utils-find-tag-default)))))
 
 (defun magik-cb-mode-line-click (event)
-  "Move the cb modeline 'cursor'."
+  "Move the cb modeline `cursor'."
   (interactive "@e")
   (let*
       ((b (window-buffer (posn-window (event-start event))))

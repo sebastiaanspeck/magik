@@ -82,13 +82,15 @@ Or as fallback the normal newline behaviour."
   )
 
 (defun magik-session-extras-set-cb-process-var ()
-  "Set the `magik-cb-process' variable.  So that the callback to `magik-cb-send-string' will work."
+  "Set the `magik-cb-process' variable.
+So that the callback to `magik-cb-send-string' will work."
   (unless magik-cb-process
     (setq magik-cb-process (magik-cb-process (get-buffer (concat "*cb*" (buffer-name (current-buffer))))))
     (magik-cb-process))
   )
 
 (defun magik-session-extras-go-to-method-definition (method-name exemplar-name)
+  "Go to the method definition using METHOD-NAME and EXEMPLAR-NAME."
   (magik-transmit-string (concat "method_finder.emacs_go_to_method_definition(\"" method-name "\",\"" exemplar-name "\")" "\n")
 			 (save-excursion 
 			   (beginning-of-line) 

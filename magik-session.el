@@ -1440,7 +1440,7 @@ This function applies SWITCHES for additional options."
       (message "Printing... Done"))))
 
 (defun magik-session-error-narrow-region ()
-  "Narrow the buffer to the region between the current Magik prompts."
+  "Narrow the buffer to the region between the current Magik prompt(s)."
   (narrow-to-region (save-excursion (re-search-backward magik-session-prompt))
 		    (save-excursion
 		      (or (re-search-forward magik-session-prompt nil t) (goto-char (point-max)))

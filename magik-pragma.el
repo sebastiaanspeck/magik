@@ -52,14 +52,14 @@ This command handles multiline _pragma statements."
 	(search-forward "=" end-bracket t)))))
 
 (defun magik-electric-pragma-slash (arg)
-  "Insert the char, `/', unless the current line starts with `_pragma', in
-which case we toggle back through the various pragma options."
+  "If the line ARG begins with `_pragma', toggle pragma options.
+If not, insert `/'"
   (interactive "*p")
   (magik-pragma-electric-toggle-option arg 'forward))
 
 (defun magik-electric-pragma-backslash (arg)
-  "Insert the char, `\\', unless the current line starts with `_pragma', in
-which case we toggle back through the various pragma options."
+  "If the line ARG begins with `_pragma', toggle back through the pragma options.
+If not, insert `\\'"
   (interactive "*p")
   (magik-pragma-electric-toggle-option arg 'backward))
 
@@ -311,8 +311,8 @@ The format follows that described in pragma-do-if-match.")
 The format follows that described in pragma-do-if-match.")
 
 (defun magik-pragma-electric-toggle-option (arg direction)
-  "Insert the char, `/', unless the current line starts with `_pragma', in
-which case we toggle through the various pragma options."
+  "If the line ARG begins with `_pragma', toggle pragma options.
+If not, insert `/'.  DIRECTION is either forward or backward."
   (save-match-data
     (let ((magik-pragma-brackets (magik-pragma-line-p)))
       (cond ((consp magik-pragma-brackets)
@@ -346,7 +346,7 @@ which case we toggle through the various pragma options."
 (defun magik-pragma-electric-toggle (direction)
   "Toggle the values for the different fields used in the pragma line.
 
-DIRECTION indicates whether the values should change 'forward or 'backward
+DIRECTION indicates whether the values should change `forward' or `backward'
 relative the current setting and available values."
   ;;Handle the case where the pragma line is completely empty separately.
   (if (save-excursion (beginning-of-line) (looking-at "_pragma()"))

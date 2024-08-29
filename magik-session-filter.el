@@ -43,7 +43,7 @@
 (require 'magik-utils)
 
 (defvar magik-session-filter-state "\C-a"
-  "Either \"\\C-a\", \"\\C-e\, \"\\C-f\" or \" \".")
+  "State for session filtering: can be `C-a', `C-e', `C-f', or a space character.")
 
 (defcustom magik-session-filter-action-alist nil
   "An alist that matches the different filter actions with the action character.
@@ -256,7 +256,7 @@ action's function setting."
     (insert str)))
 
 (defun magik-session-filter-action-find-file (proc str)
-  "(Deprecated) Gis Filter Action interface for find-file.
+  "(Deprecated) Gis Filter Action interface for `find-file'.
 Find a file and goto a particular line number
 STR is of the form 42:/bla/bla/foo.magik or
 :/bla/bla/foo.magik which means don't jump to any
@@ -319,7 +319,7 @@ The behaviour is undefined if any search key and line or column are used."
       (if (setq val (assq 'column alist)) (move-to-column (string-to-number (cdr val)))))))
 
 (defun magik-session-filter-action-cb-mf (proc socketname)
-  "Magik has started a method_finder and tells Emacs what the socketname is."
+  "Magik has started a method_finder and let Emacs know what the socketname is."
   (setq magik-cb--mf-socket-synchronised socketname))
 
 (defun magik-session-filter-action-cb-goto-method (proc str)

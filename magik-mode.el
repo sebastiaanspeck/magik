@@ -1035,8 +1035,9 @@ Optional argument GIS ..."
 	  (magik-gis-error-goto)))))
 
 (defun magik-perform-replace-no-set-mark (from to regexp-flag)
-  "Like `perform-replace' but without setting the mark and without
-`query' or `delimited' flags."
+  "Replace FROM with TO, like `perform-replace' but without setting the mark.
+Ignores `query' and `delimited' flags.  Use REGEXP-FLAG to control literal
+or regex matching."
   (let ((literal (not regexp-flag))
 	(search-function (if regexp-flag 're-search-forward 'search-forward)))
     (while (and (not (eobp))
@@ -1994,8 +1995,7 @@ Once initialised this variable is not refreshed."
 (defalias 'magik-point-on-pragma-line-p 'pragma-line-p)
 
 (defun magik-translate-old-vec-notation ()
-  "Search for the next \"vec(\" in the current buffer and translate it and the
-closing bracket into the new \"{...}\" notation."
+  "Translate the next \"vec(\" to the new \"{...}\" notation in the buffer."
   (interactive)
   (re-search-forward "\\<vec(")
   (backward-char 4)

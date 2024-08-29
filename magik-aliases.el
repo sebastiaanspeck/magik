@@ -141,7 +141,7 @@ If any function returns t, then the buffer is displayed."
   :type 'sexp)
 
 (defvar magik-aliases-exec-path nil
-  "Stored `exec-path' for executing GIS command.")
+  "Stored value of the variable `exec-path' for executing GIS commands.")
 
 (defvar magik-aliases-process-environment nil
   "Stored `process-environment' for executing GIS command.")
@@ -251,19 +251,14 @@ You can customise magik-aliases-mode with the magik-aliases-mode-hook.
     (reverse list)))
 
 (defun magik-aliases-switch-to-buffer (alias)
-  "Return t, to switch to the buffer that the GIS.exe process is running in.
-Since some entries in the aliases file do not start a Smallworld Magik GIS
-process we do not necessarily want to switch to the buffer running the
-process all the time.  These are the following methods by which we control
-when the buffer is displayed:
-  Hook: `aliases-switch-to-buffer-hooks'
-       Each function in the hook is passed the name of the alias.
-       If any function returns t, then the buffer is displayed.
-  Regexp: `aliases-switch-to-buffer-regexp'
-       If the alias name matches the given regular expression the buffer
-       is displayed.
-  Variable: `aliases-switch-to-buffer'
-       If this is t then the buffer is displayed."
+  "Return t to switch to the GIS.exe buffer if ALIAS matches any of the following.
+- Hook: `magik-aliases-switch-to-buffer-hooks'
+  Each function in this hook is passed the alias name.
+  If any function returns t, the buffer is displayed.
+- Regexp: `magik-aliases-switch-to-buffer-regexp'
+  If the alias name matches this regular expression, the buffer is displayed.
+- Variable: `magik-aliases-switch-to-buffer'
+  If this variable is t, the buffer is displayed."
   (cond ((run-hook-with-args-until-success 'magik-aliases-switch-to-buffer-hooks alias)
 	 t)
 	((stringp magik-aliases-switch-to-buffer-regexp)
@@ -273,7 +268,10 @@ when the buffer is displayed:
 	 magik-aliases-switch-to-buffer)))
 
 (defun magik-aliases-program-set (&optional default)
-  "Return the program to use to operate on a gis_aliases file."
+  "Return the executable program to operate on a gis_aliases file.
+If an executable file is found in the directories
+listed in `magik-aliases-program-path`, return its path.
+If no executable is found, return the DEFAULT value or nil."
   (let ((path magik-aliases-program-path)
 	program)
     (while path
@@ -292,9 +290,7 @@ when the buffer is displayed:
     (or program default)))
 
 (defun magik-aliases-run-program (&optional alias file dir)
-  "Run `runalias' on the aliases file.
-
-With a prefix arg, ask user for current directory to use."
+  "Run `runalias' on ALIAS from FILE in DIR.  Prompt for DIR with prefix arg."
   (interactive (if (not (magik-aliases-at-alias-definition))
 		   (list
 		    (completing-read "Definition: "
@@ -413,7 +409,7 @@ Returns nil if FILE cannot be expanded."
   "Read LAYERED_PRODUCTS configuration file.
 
   Read contents of FILE with the format of LAYERED_PRODUCTS configuration file
-  and return paths to append to `exec-path'."
+  and return paths to append to variable `exec-path'."
   (when (file-exists-p file)
     (with-current-buffer (get-buffer-create " *aliases LAYERED_PRODUCTS*")
       (insert-file-contents file nil nil nil 'replace)

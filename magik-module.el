@@ -1,4 +1,4 @@
-;;; magik-module.el --- mode for editing Magik module.def files.
+;;; magik-module.el --- mode for editing Magik module.def files.  -*- lexical-binding: t; -*-
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -158,11 +158,6 @@ You can customize Module Mode with the `magik-module-mode-hook`.
   "Default fontification of module.def files."
   :group 'module
   :type 'sexp)
-
-(defun magik-module-customize ()
-  "Open Customization buffer for Module Mode."
-  (interactive)
-  (customize-group 'magik-module))
 
 (defun magik-module-toggle-save-magikc (arg)
   "Toggle saving of .magikc files when loading module."

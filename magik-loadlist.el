@@ -1,4 +1,4 @@
-;;; magik-loadlist.el --- mode for editing Magik load_list.txt files.
+;;; magik-loadlist.el --- mode for editing Magik load_list.txt files.  -*- lexical-binding: t; -*-
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -209,7 +209,7 @@ With a prefix arg accept all changes without prompting."
       "$\n"))))
 
 (defun magik-loadlist-gis-drag-n-drop-load (gis filename)
-  "Interface to Drag 'n' Drop GIS mode.
+  "Interface to Drag \\='n Drop GIS mode.
 Called by `gis-drag-n-drop-load' when a load_list.txt file is dropped."
   (let ((process (barf-if-no-gis gis))
         (dir  (file-name-directory filename))

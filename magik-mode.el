@@ -128,14 +128,14 @@ concrete implementations."
 
   (compat-call setq-local
                font-lock-defaults '((magik-font-lock-keywords
-				    magik-font-lock-keywords-1
-				    magik-font-lock-keywords-2
-				    magik-font-lock-keywords-3
-				    magik-font-lock-keywords-4
-				    magik-font-lock-keywords-5)
-				   nil t
-				   ((?_ . "w")))
-	      indent-line-function 'magik-indent-line))
+				     magik-font-lock-keywords-1
+				     magik-font-lock-keywords-2
+				     magik-font-lock-keywords-3
+				     magik-font-lock-keywords-4
+				     magik-font-lock-keywords-5)
+				    nil t
+				    ((?_ . "w")))
+	       indent-line-function 'magik-indent-line))
 
 (defvar magik-menu nil
   "Keymap for the Magik buffer menu bar.")

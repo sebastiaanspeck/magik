@@ -143,11 +143,11 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
      process
      (format
       "_proc(file)
-	 message_handler.compile_message_file(file)
-	 _local message_handler_name << system.split_filename(system.pathname_components(file))
-	 _if message_handler_name _isnt _unset
-	 _then sw:message_handler.new(message_handler_name).load_message_file(file)
-	 _endif
+  message_handler.compile_message_file(file)
+  _local message_handler_name << system.split_filename(system.pathname_components(file))
+  _if message_handler_name _isnt _unset
+  _then sw:message_handler.new(message_handler_name).load_message_file(file)
+  _endif
       _endproc(%S)\n$\n"
       filename))
     gis))
@@ -172,8 +172,8 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
    _handling sw_module_already_defined, sw_module_moved_module _with procedure
 
    module << sw_module_manager.locate_module(directory)
-   _if module _isnt _unset 
-   _then sw_module_manager.compile_messages(module) 
+   _if module _isnt _unset
+   _then sw_module_manager.compile_messages(module)
    _endif
       _endproc(%S)\n$\n"
       directory))

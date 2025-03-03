@@ -320,17 +320,17 @@ Will set `gis-version-file' to FILE."
 
       (if (search-forward "-------" nil t) (forward-line 1)) ;skip a header
       (while (re-search-forward magik-version-match nil t)
-	(beginning-of-line)
-	(forward-char 1)
-	(delete-char -1)
-	(insert " ")
-	(cond ((string-match magik-version-invalid-string (match-string-no-properties 3))
-	       nil)
-	      ((file-exists-p (match-string-no-properties 3))
-	       nil)
-	      (t
-	       (goto-char (match-beginning 3))
-	       (insert magik-version-invalid-string " "))))))
+        (beginning-of-line)
+        (forward-char 1)
+        (delete-char -1)
+        (insert " ")
+        (cond ((string-match magik-version-invalid-string (match-string-no-properties 3))
+               nil)
+              ((file-exists-p (match-string-no-properties 3))
+               nil)
+              (t
+               (goto-char (match-beginning 3))
+               (insert magik-version-invalid-string " "))))))
 
   (if (stringp magik-version-current)
       (save-excursion

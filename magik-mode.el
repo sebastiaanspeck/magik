@@ -128,14 +128,14 @@ concrete implementations."
 
   (compat-call setq-local
                font-lock-defaults '((magik-font-lock-keywords
-				     magik-font-lock-keywords-1
-				     magik-font-lock-keywords-2
-				     magik-font-lock-keywords-3
-				     magik-font-lock-keywords-4
-				     magik-font-lock-keywords-5)
-				    nil t
-				    ((?_ . "w")))
-	       indent-line-function 'magik-indent-line))
+                                     magik-font-lock-keywords-1
+                                     magik-font-lock-keywords-2
+                                     magik-font-lock-keywords-3
+                                     magik-font-lock-keywords-4
+                                     magik-font-lock-keywords-5)
+                                    nil t
+                                    ((?_ . "w")))
+               indent-line-function 'magik-indent-line))
 
 (defvar magik-menu nil
   "Keymap for the Magik buffer menu bar.")
@@ -1460,8 +1460,8 @@ If PT is given, goto that char position."
   (let
       ((col (current-column))
        (str (string-replace  "\"" "\" + %\" + \""
-			     (buffer-substring-no-properties
-			      (point) (line-end-position)))))
+                             (buffer-substring-no-properties
+                              (point) (line-end-position)))))
     (beginning-of-line)
     (indent-to col)
     (insert "write(\""
@@ -2049,7 +2049,7 @@ Once initialised this variable is not refreshed."
 (defun magik--snippets-initialize ()
   "Initialize the Magik snippets."
   (let ((snip-dir (expand-file-name "snippets" (file-name-directory (or load-file-name (buffer-file-name))))))
-   (when (boundp 'yas-snippet-dirs)
+    (when (boundp 'yas-snippet-dirs)
       (add-to-list 'yas-snippet-dirs snip-dir t))
     (yas-load-directory snip-dir)))
 

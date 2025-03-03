@@ -41,9 +41,12 @@ Major mode for managing multiple Magik environments.
 
 | Key | Description |
 | :---: | --- |
-| <kbd>Return</kbd> | Select the current selected line as the current active environment. |
-| <kbd>a</kbd> | Open gis_aliases file of selected version. Will prompt for layered product to use if selected version has more than one aliases file available. |
-| <kbd>+</kbd> | Add a new entry to the currently open file. |
+| `Return` | Select the current selected line as the current active environment. |
+| `Space` or `Down` | Move to the next environment. |
+| `a` | Open gis_aliases file of selected version. Will prompt for layered product to use if selected version has more than one aliases file available. |
+| `+` | Add a new entry to the currently open file. |
+| `o` | Open the `gis_version.txt` file to add or edit the file itself. |
+| `q` | Quit the buffer. |
 
 ### magik-aliases
 
@@ -51,7 +54,9 @@ Major mode for editing Magik aliases files.
 
 | Key | Description |
 | :---: | --- |
-| <kbd>Shift</kbd>-<kbd>Return</kbd> | Run a Magik session for the selected alias. |
+| `Shift`-`Return` | Run a Magik session for the selected alias. |
+| `Space` or `Down` | Move to the next alias. |
+| `q` | Quit the buffer. |
 
 ### magik-session
 

@@ -177,8 +177,11 @@ concrete implementations."
     [,"Uncomment Region"         magik-uncomment-region        t]
     [,"Fill Comment"             magik-fill-public-comment     t]
     "---"
-    [,"Check sw-method-docs for method"      magik-single-sw-method-docs t]
-    [,"Check sw-method-docs for file"        magik-file-sw-method-docs   t]
+    [,"Check sw-method-doc for method"      magik-single-method-sw-method-doc t]
+    [,"Check sw-method-doc for file"        magik-file-sw-method-doc       t]
+    [,"Check type-doc for method"           magik-single-method-type-doc   t]
+    [,"Check type-doc for exemplar"         magik-single-exemplar-type-doc t]
+    [,"Check type-doc for file"             magik-file-type-doc            t]
     [,"Check pragma for method/def_slotted_exemplar" magik-single-pragma t]
     [,"Check pragma for file"                        magik-file-pragma   t]
     "---"
@@ -2189,8 +2192,8 @@ closing bracket into the new \"{...}\" notation."
   (define-key magik-base-mode-map (kbd "<f2> <up>") 'magik-backward-method)
   (define-key magik-base-mode-map (kbd "<f2> <down>") 'magik-forward-method)
   (define-key magik-base-mode-map (kbd "<f2> $") 'magik-transmit-$-chunk)
-  (define-key magik-base-mode-map (kbd "<f2> D") 'magik-file-sw-method-docs)
-  (define-key magik-base-mode-map (kbd "<f2> d") 'magik-single-sw-method-docs)
+  (define-key magik-base-mode-map (kbd "<f2> D") 'magik-file-sw-method-doc)
+  (define-key magik-base-mode-map (kbd "<f2> d") 'magik-single-method-sw-method-doc)
   (define-key magik-base-mode-map (kbd "<f2> P") 'magik-file-pragma)
   (define-key magik-base-mode-map (kbd "<f2> p") 'magik-single-pragma)
 

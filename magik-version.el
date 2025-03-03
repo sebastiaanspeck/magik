@@ -519,14 +519,15 @@ Used before running a GIS process."
 (progn
   ;; ------------------------ magik version mode ------------------------
 
-  (define-key magik-version-mode-map " "    'magik-version-next)
-  (define-key magik-version-mode-map "a"    'magik-version-gis-aliases)
-  (define-key magik-version-mode-map "+"    'magik-version-file-add)
-  (define-key magik-version-mode-map "o"    'magik-version-file-open)
-  (define-key magik-version-mode-map "q"    'magik-version-quit)
-  (define-key magik-version-mode-map "r"    'magik-version-run)
-  (define-key magik-version-mode-map "\r"   'magik-version-select)
-  (define-key magik-version-mode-map [mouse-2] 'magik-version-mouse-select)
+  (define-key magik-version-mode-map " "  'magik-version-next)
+  (define-key magik-version-mode-map "a"  'magik-version-gis-aliases)
+  (define-key magik-version-mode-map "+"  'magik-version-file-add)
+  (define-key magik-version-mode-map "o"  'magik-version-file-open)
+  (define-key magik-version-mode-map "q"  'magik-version-quit)
+  (define-key magik-version-mode-map "r"  'magik-version-run)
+  (define-key magik-version-mode-map "\r" 'magik-version-select)
+
+  (define-key magik-version-mode-map [mouse-2]              'magik-version-mouse-select)
   (define-key magik-version-mode-map [remap read-only-mode] 'magik-version-disable-read-only-mode))
 
 

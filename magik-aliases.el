@@ -91,7 +91,7 @@ If any function returns t, then the buffer is displayed."
   :type  'hook)
 
 (defvar magik-aliases-definition-regexp "^\\([^#]\\S-+\\):\\s-*$"
-  "Regexp matching an alias definition")
+  "Regexp matching an alias definition.")
 
 ;; Imenu configuration
 (defvar magik-aliases-imenu-generic-expression
@@ -105,7 +105,7 @@ If any function returns t, then the buffer is displayed."
   (list
    (cons magik-aliases-definition-regexp 'font-lock-function-name-face)
    '("^\\s-+\\([A-Z_]+\\)\\s-*:=" 1 font-lock-type-face)
-   '("^\\s-+\\([A-Z_]+\\)\\s-*=" 1 font-lock-variable-name-face)
+   '("^\\s-+\\([A-Z_0-9]+\\)\\s-*=" 1 font-lock-variable-name-face)
    '("^\\s-+\\(\\sw+\\)\\s-*=" 1 font-lock-builtin-face)
    '("\\s$\\sw+\\s$" . font-lock-constant-face)
    )
@@ -221,7 +221,7 @@ You can customise magik-aliases-mode with the magik-aliases-mode-hook.
   "Return t, to switch to the buffer that the GIS.exe process is running in.
 Since some entries in the aliases file do not start a Smallworld Magik GIS
 process we do not necessarily want to switch to the buffer running the
-process all the time. These are the following methods by which we control
+process all the time.  These are the following methods by which we control
 when the buffer is displayed:
   Hook: `aliases-switch-to-buffer-hooks'
        Each function in the hook is passed the name of the alias.
@@ -230,8 +230,7 @@ when the buffer is displayed:
        If the alias name matches the given regular expression the buffer
        is displayed.
   Variable: `aliases-switch-to-buffer'
-       If this is t then the buffer is displayed.
-"
+       If this is t then the buffer is displayed."
   (cond ((run-hook-with-args-until-success 'magik-aliases-switch-to-buffer-hooks alias)
          t)
         ((stringp magik-aliases-switch-to-buffer-regexp)

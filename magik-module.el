@@ -159,11 +159,6 @@ You can customize Module Mode with the `magik-module-mode-hook`.
   :group 'module
   :type 'sexp)
 
-(defun magik-module-customize ()
-  "Open Customization buffer for Module Mode."
-  (interactive)
-  (customize-group 'magik-module))
-
 (defun magik-module-toggle-save-magikc (arg)
   "Toggle saving of .magikc files when loading module."
   (interactive "P")

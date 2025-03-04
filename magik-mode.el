@@ -994,7 +994,7 @@ you can use \\[isearch-forward-regexp] and use \\[isearch-ring-retreat] to recal
 
 (defun magik-goto-class-method-loop (search-str arg)
   "Loop over subsequent definitions.
-Adds string to `regexp-search-ring'.  After quiting this loop
+Adds string to `regexp-search-ring'.  After quitting this loop
 you can use \\[isearch-forward-regexp] and use M-p to recall this search."
   ;;I would like to use the isearch functionality but I cannot work out
   ;;how to control isearch programmatically.

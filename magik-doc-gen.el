@@ -56,7 +56,7 @@ Complete the documentation using sw-method-doc format."
 
 (defun magik-file-type-doc ()
   "Search a file for missing parameters in the methods and slots in exemplar.
-Complete the documenation using type-doc format."
+Complete the documentation using type-doc format."
   (interactive)
   (save-excursion
     (cond

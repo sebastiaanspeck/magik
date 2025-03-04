@@ -97,7 +97,7 @@ magik-template-file-type-alist to make the user
 selection pick up the new template file.")
 
 (defvar-local magik-template-file-type nil
-  "Type of Magik file being editted.
+  "Type of Magik file being edited.
 This variable is buffer local and is used to identify the type of magik file it is,
 i.e. which Template file it came from.
 

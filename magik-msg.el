@@ -153,7 +153,7 @@ The GIS process used is either that given by BUF or the variable `gis-buffer'."
     gis))
 
 (defun magik-msg-compile-module-messages (&optional gis)
-  "Compile all messages asociated with the module this buffer is assocaiated with in a GIS process.
+  "Compile all messages associated with the module this buffer is assocaiated with in a GIS process.
 The GIS process used is either that given by BUF or the variable `gis-buffer'."
   (interactive)
   (let ((gis (magik-utils-get-buffer-mode gis

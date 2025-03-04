@@ -224,7 +224,7 @@ concrete implementations."
     (,"new/init"
      "_method\\s-+\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\.\\(new\\|init\\)\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)" magik-imenu-method-name 1)
     (,"Procedures"
-     "\\b_\\sw+\\(\n\\|\\s-\\)+\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)\\s-*<<\\(\n\\|\\s-\\)*_proc\\s-*(" 2) ;unamed, use variable assignment
+     "\\b_\\sw+\\(\n\\|\\s-\\)+\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)\\s-*<<\\(\n\\|\\s-\\)*_proc\\s-*(" 2) ;unnamed, use variable assignment
     (,"Procedures"
      "_proc\\s-*\\(@\\s-*\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)\\s-*(" magik-imenu-method-name 1) ;named using @
     (,"Condition"
@@ -237,7 +237,7 @@ concrete implementations."
      "^\\s-*\\(.+\\)\\.define_shared_constant([ \t\n]*:\\s-*\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)" 2)
     (,"Slot Access"
      "^\\s-*\\(.+\\)\\.define_slot_\\(access\\|externally_readable\\|externally_writable\\)([ \t\n]*:\\s-*\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)" 3)
-    (,"Pseduo Slots"
+    (,"Pseudo Slots"
      "^\\s-*\\(.+\\)\\.define_pseudo_slot([ \t\n]*:\\s-*\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)" 2) ; define_slot_externally_* rarely used.
     (,"Mixins"
      "^\\s-*def_mixin([ \t\n]*:\\(\\sw*\\(\\s$\\S$*\\s$\\sw*\\)?\\)" 1)
@@ -746,6 +746,97 @@ Use auto-complete mode \"g\" symbol convention to represent a global.")
                (looking-at "_else\\|_elif\\|_finally\\|_using\\|_with\\|_when\\|_protection\\|_end"))
           (magik-indent-command)))))
 
+;;Actually only used by the Magik-Patch minor mode but we need a hook here
+;;because a function must be referred to in font-lock-defaults.
+(defvar magik-goto-code-function 'point-min
+  "Function used to place point on the line immediately preceding Magik code.")
+
+(defun magik-goto-code ()
+  "Goto start of code."
+  (funcall magik-goto-code-function))
+
+(defun magik-font-lock-fontify-buffer ()
+  (let ((verbose (if (numberp font-lock-verbose)
+                     (> (buffer-size) font-lock-verbose)
+                   font-lock-verbose))
+        (code-start (save-excursion (magik-goto-code))))
+    (with-temp-message
+        (when verbose
+          (format "Fontifying %s..." (buffer-name)))
+      ;; Make sure we have the right `font-lock-keywords' etc.
+      (unless font-lock-mode
+        (font-lock-set-defaults))
+      ;; Make sure we fontify etc. in the whole buffer.
+      (save-restriction
+        (widen)
+        (condition-case nil
+            (save-excursion
+              (save-match-data
+                (font-lock-fontify-region code-start (point-max) verbose)
+                (font-lock-after-fontify-buffer)
+                (setq font-lock-fontified t)))
+          ;; We don't restore the old fontification, so it's best to unfontify.
+          (quit (font-lock-unfontify-buffer))))
+      ;; Make sure we undo `font-lock-keywords' etc.
+      (unless font-lock-mode
+        (font-lock-unset-defaults)))))
+
+(defun magik-font-lock-unfontify-buffer ()
+  "Make sure we unfontify etc.  in the whole buffer."
+  (save-restriction
+    (widen)
+    (font-lock-unfontify-region (save-excursion (magik-goto-code)) (point-max))
+    (font-lock-after-unfontify-buffer)
+    (setq font-lock-fontified nil)))
+
+(defun magik-font-lock-fontify-region (beg end loudly)
+  (let*
+      ((modified (buffer-modified-p))
+       (buffer-undo-list t)
+       (inhibit-read-only t)
+       (inhibit-point-motion-hooks t)
+       (inhibit-modification-hooks t)
+       deactivate-mark buffer-file-name buffer-file-truename
+       (old-syntax-table (syntax-table))
+       (code-start (save-excursion (magik-goto-code))))
+    (unwind-protect
+        (save-restriction
+          (widen)
+          ;; Use the fontification syntax table, if any.
+          (when font-lock-syntax-table
+            (set-syntax-table font-lock-syntax-table))
+          ;; check to see if we should expand the beg/end area for
+          ;; proper multiline matches
+          (when (and (boundp 'font-lock-multiline)
+                     font-lock-multiline
+                     (> beg code-start)
+                     (get-text-property (1- beg) 'font-lock-multiline))
+            ;; We are just after or in a multiline match.
+            (setq beg (or (previous-single-property-change
+                           beg 'font-lock-multiline)
+                          code-start))
+            (goto-char beg)
+            (setq beg (line-beginning-position)))
+          (when (and (boundp 'font-lock-multiline) font-lock-multiline)
+            (setq end (or (text-property-any end (point-max)
+                                             'font-lock-multiline nil)
+                          (point-max))))
+          (goto-char end)
+          (setq end (line-beginning-position 2))
+          (if (and (>= end code-start) (< beg code-start))
+              (setq beg code-start))
+          (when (and (>= beg code-start)
+                     (>= end code-start))
+            ;; Now do the fontification.
+            (font-lock-unfontify-region beg end)
+            (unless font-lock-keywords-only
+              (font-lock-fontify-syntactically-region beg end loudly))
+            (font-lock-fontify-keywords-region beg end loudly)))
+      ;; Clean up.
+      (set-syntax-table old-syntax-table))
+    (if (and (not modified) (buffer-modified-p))
+        (set-buffer-modified-p nil))))
+
 (defun magik-toggle-transmit-debug-p (&optional arg)
   "Toggle transmission of #DEBUG statements in Magik code.
 Optional argument ARG .."
@@ -1073,7 +1164,7 @@ Optional argument GIS ..."
       (replace-match to t literal))))
 
 (defun magik-transmit-method-eom-mode (arg)
-  "Toggle whether to move the cursor to the end of the method after tranmitting.
+  "Toggle whether to move the cursor to the end of the method after transmitting.
 If nil, leave point where it is,
 If t or \\='end, move point to end of method,
 If \\='repeat, move point to end of method on 2nd and subsequent uses of the command.
@@ -1866,7 +1957,7 @@ the list of all possible matches, without recourse to the class browser."
           (setq ac-prefix (concat exemplar  "." (if (> (length ac-prefix) 0) (substring ac-prefix 0 1))))
           (if (and magik-ac-class-method-source-cache
                    (equal (concat " " ac-prefix) (car magik-ac-class-method-source-cache)))
-              ;; Re-use cache.
+              ;; Reuse cache.
               magik-ac-class-method-source-cache
             ;; reset cache
             (setq magik-ac-class-method-source-cache (magik-cb-ac-method-candidates)))))))

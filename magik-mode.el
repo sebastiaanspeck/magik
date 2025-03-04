@@ -373,7 +373,7 @@ concrete implementations."
 
 (defface magik-method-face
   '((t (:inherit font-lock-function-name-face)))
-  "Face to use for method names and method and procedure keywords."
+  "Font-lock Face to use when displaying method names & method/procedure keywords."
   :group 'magik-faces)
 
 (defface magik-label-face
@@ -594,7 +594,7 @@ See `magik-font-lock-keywords-1' and `magik-font-lock-keywords-2'."
     ))
   "Font lock setting for 4th level of Magik fontification.
 As 1st level but also fontifies all Magik keywords according their
-different classifications."
+different classifications.  e.g. loop keywords are fontified in the same face."
   :group 'magik
   :type 'sexp)
 
@@ -994,7 +994,7 @@ you can use \\[isearch-forward-regexp] and use \\[isearch-ring-retreat] to recal
 
 (defun magik-goto-class-method-loop (search-str arg)
   "Loop over subsequent definitions.
-Adds string to `regexp-search-ring'. After wuiting this loop
+Adds string to `regexp-search-ring'.  After quiting this loop
 you can use \\[isearch-forward-regexp] and use M-p to recall this search."
   ;;I would like to use the isearch functionality but I cannot work out
   ;;how to control isearch programmatically.
@@ -1116,7 +1116,7 @@ If the last command was \\[magik-mark-method] then that region will be copied in
          x)))
 
 (defun magik-function (cmd &rest args)
-  "Generate magik code from the supplied arguments.
+  "Generate Magik code from the supplied arguments.
 e.g. (magik-function \"system.test\" \"file\" \\='unset 4) returns the string
      system.test(\\\"file\\\", _unset, 4)
 Argument CMD ...
@@ -1298,7 +1298,7 @@ Otherwise, point is left where it is."
 (defalias 'transmit-method-to-magik 'magik-transmit-method)
 
 (defun magik-transmit-region (beg end)
-  "Send current region via a temp file to Magik in a shell, using load-file.
+  "Send current region via a temp file to Magik in a shell, using load_file.
 If this command is repeated before the previous file has been processed by Magik,
 another file shall be written."
   (interactive "r")

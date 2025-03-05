@@ -2032,6 +2032,18 @@ Once initialised this variable is not refreshed."
                     magik-ac-object-source
                     magik-ac-global-source)))))
 
+(defun magik--in-string-or-comment-p ()
+  "Return non-nil if point is inside a string or comment."
+  (syntax-ppss-context (syntax-ppss)))
+
+(defun magik-yas-maybe-expand ()
+  "Expand `yasnippet` if possible, otherwise insert a space.
+Prevents expansion inside strings and comments."
+  (interactive)
+  (if (or (magik--in-string-or-comment-p)
+          (not (yas-expand)))
+      (insert " ")))
+
 ;;; Package initialisation
 (define-abbrev-table 'magik-base-mode-abbrev-table
   (mapcar (lambda (str)
@@ -2155,7 +2167,7 @@ Once initialised this variable is not refreshed."
   (define-key magik-mode-map "\t" 'magik-indent-command)
   (define-key magik-mode-map "#"  'magik-electric-hash)
 
-  (define-key magik-base-mode-map " " yas-maybe-expand)
+  (define-key magik-base-mode-map " " 'magik-yas-maybe-expand)
   (define-key magik-base-mode-map "/" 'magik-electric-pragma-slash)
   (define-key magik-base-mode-map "\\" 'magik-electric-pragma-backslash)
 

@@ -69,4 +69,6 @@ jobs:
         version: 'snapshot'
 
     - name: Run tests
-      run: make ci
+      run: |
+        emacs --version
+        make ci

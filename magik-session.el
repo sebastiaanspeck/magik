@@ -85,7 +85,6 @@
 
 (require 'yasnippet)
 (require 'magik-mode)
-(require 'magik-electric)
 (require 'magik-indent)
 (require 'magik-pragma)
 (or (boundp 'ac-sources) (setq ac-sources nil))
@@ -561,6 +560,7 @@ Entry to this mode runs `magik-session-mode-hook`.
   (with-current-buffer (get-buffer-create (concat " *filter*" (buffer-name)))
     (erase-buffer))
 
+  (add-hook 'before-change-functions 'magik-session--prepare-for-edit-cmd nil t)
   (add-hook 'menu-bar-update-hook 'magik-session-update-magik-session-menu nil t)
   (add-hook 'menu-bar-update-hook 'magik-session-update-tools-magik-gis-menu nil t)
   (add-hook 'menu-bar-update-hook 'magik-session-update-tools-magik-shell-menu nil t)
@@ -886,30 +886,23 @@ Also append the string to \" *history**gis*\"."
 (defun magik-session--make-new-cmds-vec ()
   "Create a new bigger vector for `magik-session-prev-cmds'.
 Copies the non-degenerate commands into it."
-  (message "Resizing the command history vector...")
-  (let*
-      ((len (length magik-session-prev-cmds))
-       (v (make-vector (+ len 100) nil))
-       (i 0)
-       (v_i 0))
-    (while
-        (< i len)
-      (let
-          ((x (aref magik-session-prev-cmds i)))
-        (if (and (marker-buffer (car x))
-                 (marker-buffer (cdr x))
-                 (> (cdr x) (car x)))
-            (progn
-              (aset v v_i x)
-              (cl-incf v_i))))
+  (let* ((len (length magik-session-prev-cmds))
+         (v (make-vector (+ len 100) nil))
+         (i 0)
+         (v_i 0))
+    (while (< i len)
+      (let ((x (aref magik-session-prev-cmds i)))
+        (when (and (marker-buffer (car x))
+                   (marker-buffer (cdr x))
+                   (> (cdr x) (car x)))
+          (aset v v_i x)
+          (cl-incf v_i)))
       (cl-incf i))
-    (let
-        ((m (copy-marker (point-min))))
+    (let ((m (copy-marker (point-min))))
       (aset v v_i (cons m m)))
     (compat-call setq-local
                  magik-session-no-of-cmds (1+ v_i)
-                 magik-session-prev-cmds v)
-    (message "Re-sizing the command history vector... Done. (%s commands)." (number-to-string v_i))))
+                 magik-session-prev-cmds v)))
 
 (defun magik-session-beginning-of-line (&optional n)
   "Move point to beginning of Nth line or just after prompt.
@@ -927,11 +920,9 @@ If command is repeated then place point at beginning of prompt."
 
 (defun magik-session-toggle-dollar ()
   "Toggle auto-insertion of $ terminator."
-  (interactive )
+  (interactive)
   (setq magik-session-auto-insert-dollar (not magik-session-auto-insert-dollar))
-  (if magik-session-auto-insert-dollar
-      (message "Insert dollar now enabled")
-    (message "Insert dollar now disabled")))
+  (message "Insert dollar now %s" (if (symbol-value magik-session-auto-insert-dollar) "enabled" "disabled")))
 
 (defun magik-session-newline (arg)
   "If in a previous cmd, recall.
@@ -1075,63 +1066,13 @@ Return nil if it isn't in the half-open range [MIN, MAX)."
          (t
           (error "Sorry... Confused command recall"))))))
 
-(defun magik-session-electric-magik-space (arg)
-  "Copy blocks to the bottom of the Magik buffer first.
-Then do an electric space using ARG."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (magik-electric-space arg))
-
-(defun magik-session-insert-char (char)
-  "Take a copy of a command before inserting the CHAR."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (self-insert-command char))
-
-(defun magik-session-delete-char (char)
-  "Take a copy of a command before deleting the CHAR."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (delete-char char))
-
-(defun magik-session-kill-word (word)
-  "Take a copy of a command before killing the WORD."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (kill-word word))
-
-(defun magik-session-backward-kill-word (word)
-  "Take a copy of a command before killing the WORD."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (backward-kill-word word))
-
-(defun magik-session-backward-delete-char (n)
-  "Take a copy of a command before deleting the char N times."
-  (interactive "*p")
-  (magik-session--prepare-for-edit-cmd)
-  (delete-char (- n)))
-
-(defun magik-session-kill-line (line)
-  "Take a copy of a command before killing the LINE."
-  (interactive "*P")
-  (magik-session--prepare-for-edit-cmd)
-  (kill-line line))
-
-(defun magik-session-kill-region (beg end)
-  "Ask if they really want to kill the region from BEG to END, before killing it."
-  (interactive "*r")
-  (if (y-or-n-p "Cutting and pasting big regions can confuse the gis-mode markers... Kill anyway?")
-      (kill-region beg end)))
-
-(defun magik-session--prepare-for-edit-cmd ()
+(defun magik-session--prepare-for-edit-cmd (_beg _end)
   "If we're in a previous command, replace any current command with this one."
-  (let
-      ((n (magik-session--get-curr-cmd-num)))
-    (if n
-        (magik-session-copy-cmd n
-                                (- (point)
-                                   (car (aref magik-session-prev-cmds n)))))))
+  (let ((n (magik-session--get-curr-cmd-num)))
+    (when n
+      (magik-session-copy-cmd n
+                              (- (point)
+                                 (car (aref magik-session-prev-cmds n)))))))
 
 (defun magik-session-send-command-at-point ()
   "Send the command at point.
@@ -1182,23 +1123,25 @@ An internal function that deals with 4 cases."
         (progn
           (cl-incf n step)
           (not (magik-session--matching-cmd-p n str))))
-    (if (= n -1)
-        (if (equal str "")
-            (error "No previous command")
-          (error "No previous command matching '%s'" str)))
+    (when (= n -1)
+      (if (equal str "")
+          (user-error "No previous command")
+        (user-error "No previous command matching '%s'" str)))
+    (when (= n magik-session-no-of-cmds)
+      (cl-decf n)
+      (if (equal str "")
+          (user-error "No next command")
+        (user-error "No next command matching '%s'" str)))
     (setq mark (process-mark (get-buffer-process (current-buffer))))
-    (if (= n magik-session-no-of-cmds)
-        (cl-decf n))
     (magik-session-copy-cmd n
                             (if (equal str "")
                                 (- (point) mark)
                               (length str)))
     (compat-call setq-local magik-session-cmd-num n)
-    (if end-of-command-p
-        (progn
-          (goto-char (point-max))
-          ;; skip back past \n$\n and whitespace
-          (skip-chars-backward " \t\n$" mark)))))
+    (when end-of-command-p
+      (goto-char (point-max))
+      ;; skip back past \n$\n and whitespace
+      (skip-chars-backward " \t\n$" mark))))
 
 (defun magik-session-recall-prev-cmd ()
   "Recall the earlier Magik session commands.
@@ -1441,20 +1384,20 @@ An error is is searched using \"**** Error\"."
       (error "Couldn't find a line starting with '**** Error' - nothing saved"))))
 
 (defun magik-session-traceback-up ()
-  "Move up buffer to next traceback."
+  "Move up buffer to the previous traceback."
   (interactive)
-  (save-match-data
-    (re-search-backward "---- traceback: "))
-  (forward-line -1))
+  (if (re-search-backward "---- traceback: " nil t)
+      (forward-line -1)
+    (user-error "No previous traceback found")))
 
 (defun magik-session-traceback-down ()
-  "Move down buffer to next traceback."
+  "Move down buffer to the next traceback."
   (interactive)
-  (forward-line 1)
-  (forward-line 1)
-  (save-match-data
-    (re-search-forward "---- traceback: "))
-  (forward-line -1))
+  (forward-line 2)
+  (if (re-search-forward "---- traceback: " nil t)
+      (forward-line -1)
+    (forward-line -2)
+    (user-error "No next traceback found")))
 
 ;;; Drag 'n' Drop
 ;;
@@ -1548,9 +1491,6 @@ where MODE is the name of the major mode with the '-mode' postfix."
 (progn
   ;; ------------------------ magik session mode ------------------------
 
-  (cl-loop for i from ?  to ?~ do
-           (define-key magik-session-mode-map (char-to-string i) 'magik-session-insert-char))
-
   (define-key magik-session-mode-error-map [mouse-2]  'magik-session-error-goto-mouse)
   (define-key magik-session-mode-error-map [C-return] 'magik-session-error-goto)
 
@@ -1558,13 +1498,7 @@ where MODE is the name of the major mode with the '-mode' postfix."
   (define-key magik-session-mode-map "\en"       'magik-session-recall-next-cmd)
   (define-key magik-session-mode-map "\r"        'magik-session-newline)
   (define-key magik-session-mode-map " "         'magik-yas-maybe-expand)
-  (define-key magik-session-mode-map "\C-?"      'magik-session-backward-delete-char)
   (define-key magik-session-mode-map "\C-a"      'magik-session-beginning-of-line)
-  (define-key magik-session-mode-map "\C-d"      'magik-session-delete-char)
-  (define-key magik-session-mode-map "\ed"       'magik-session-kill-word)
-  (define-key magik-session-mode-map "\e\C-?"    'magik-session-backward-kill-word)
-  (define-key magik-session-mode-map "\C-k"      'magik-session-kill-line)
-  (define-key magik-session-mode-map "\C-w"      'magik-session-kill-region)
   (define-key magik-session-mode-map [f8]        'magik-session-send-command-at-point)
   (define-key magik-session-mode-map "\C-c\C-c"  'magik-session-kill-process)
   (define-key magik-session-mode-map "\C-c\C-\\" 'magik-session-query-quit-shell-subjob)

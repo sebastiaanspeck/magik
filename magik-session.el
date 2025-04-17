@@ -100,15 +100,12 @@ Used for switching to the first Smallworld session."
   :group 'magik
   :type 'string)
 
-(defcustom magik-session-prompt nil
+(defcustom magik-session-prompt "Magik\\(\\|SF\\)> "
   "String or Regular expression identifying the default Magik Prompt.
 If global value is nil, a Magik session will attempt to discover the current
 setting of the Magik Prompt by calling `magik-session-prompt-get'."
   :group 'magik
   :type '(choice regexp (const nil)))
-
-;; paulw - preset rather than allow discovery (which doesn't seem to work)
-(setq magik-session-prompt "Magik\\(\\|SF\\)> ")
 
 (defcustom magik-session-command-history-max-length 90
   "*The maximum length of the displayed `magik-session-command' in the submenu.
@@ -330,16 +327,18 @@ queried irrespective of default value of `magik-session-prompt'"
   "Start a command shell with the same environment as the current Magik process."
   (interactive)
   (require 'shell)
-  (let ((process-environment (cl-copy-list magik-session-process-environment))
-        (exec-path (cl-copy-list magik-session-exec-path))
-        (buffer (concat "*shell*" (buffer-name)))
-        (version (and (boundp 'magik-session-version-current) (symbol-value 'magik-session-version-current))))
+  (let ((buffer (concat "*shell*" (buffer-name)))
+        (version (and (boundp 'magik-version-current)
+                      (symbol-value 'magik-version-current)))
+        (smallworld-gis magik-smallworld-gis))
     (make-comint-in-buffer "magik-session-shell"
                            buffer
                            (executable-find "cmd") nil "/k"
-                           (concat (getenv "SMALLWORLD_GIS") "\\config\\environment.bat"))
+                           (expand-file-name "environment.bat" (file-name-concat smallworld-gis "config")))
     (with-current-buffer buffer
-      (if (stringp version) (set 'magik-session-version-current version)))
+      (when (stringp version)
+        (set 'magik-version-current version))
+      (set 'magik-smallworld-gis smallworld-gis))
     (display-buffer buffer)))
 
 (defun magik-session-parse-gis-command (command)
@@ -484,7 +483,7 @@ Return a list of all the components of the COMMAND."
 (defun magik-session-update-tools-magik-shell-menu ()
   "Update External Shell Processes submenu in Tools -> Magik pulldown menu."
   (let ((shell-bufs (magik-utils-buffer-mode-list 'shell-mode
-                                                  (function (lambda () (getenv "SMALLWORLD_GIS")))))
+                                                  (function (lambda () (symbol-value 'magik-smallworld-gis)))))
         shell-list)
     (cl-loop for buf in shell-bufs
              do (push (vector buf (list 'display-buffer buf) t) shell-list))
@@ -526,8 +525,6 @@ Entry to this mode runs `magik-session-mode-hook`.
                                     magik-ac-object-source
                                     magik-ac-raise-condition-source)
                                   ac-sources)
-               magik-session-exec-path (cl-copy-list (or magik-session-exec-path exec-path))
-               magik-session-process-environment (cl-copy-list (or magik-session-process-environment process-environment))
                mode-line-process '(": %s")
                local-abbrev-table magik-base-mode-abbrev-table)
 
@@ -548,12 +545,6 @@ Entry to this mode runs `magik-session-mode-hook`.
       (if (assq n magik-session-buffer-alist)
           (setcdr (assq n magik-session-buffer-alist) (buffer-name))
         (add-to-list 'magik-session-buffer-alist (cons n (buffer-name))))))
-
-  ;; Special handling for *gis* buffer
-  (if (equal (buffer-name) "*gis*")
-      (compat-call setq-local
-                   magik-session-exec-path (cl-copy-list exec-path)
-                   magik-session-process-environment (cl-copy-list process-environment)))
 
   (abbrev-mode 1)
 
@@ -1068,11 +1059,10 @@ Return nil if it isn't in the half-open range [MIN, MAX)."
 
 (defun magik-session--prepare-for-edit-cmd (_beg _end)
   "If we're in a previous command, replace any current command with this one."
-  (let ((n (magik-session--get-curr-cmd-num)))
-    (when n
-      (magik-session-copy-cmd n
-                              (- (point)
-                                 (car (aref magik-session-prev-cmds n)))))))
+  (when-let* ((n (magik-session--get-curr-cmd-num)))
+    (magik-session-copy-cmd n
+                            (- (point)
+                               (car (aref magik-session-prev-cmds n))))))
 
 (defun magik-session-send-command-at-point ()
   "Send the command at point.
@@ -1404,17 +1394,16 @@ An error is is searched using \"**** Error\"."
 ;; When a file is dragged and dropped and the current buffer is
 ;; as Magik mode buffer, the file is loaded into the Magik session.
 
-(defun magik-session-drag-n-drop-mode (&optional arg)
-  "Toggle Drag and drop Magik loading functionality."
+(defun magik-session-drag-n-drop-mode (&optional value)
+  "Toggle Drag and drop Magik loading functionality using VALUE."
   (interactive "P")
   (setq magik-session-drag-n-drop-mode
-        (if (null arg)
+        (if (null value)
             (not magik-session-drag-n-drop-mode)
-          (> (prefix-numeric-value arg) 0)))
-  (add-hook 'find-file-hooks 'magik-session-drag-n-drop-load)
-  (if magik-session-drag-n-drop-mode
-      (message "Magik 'Drag and Drop' file mode is on")
-    (message "Magik 'Drag and Drop' file mode is off"))
+          (> (prefix-numeric-value value) 0)))
+  (add-hook 'find-file-hook 'magik-session-drag-n-drop-load)
+  (message "Magik 'Drag and Drop' file mode is %s"
+           (if magik-session-drag-n-drop-mode "on" "off"))
   (force-mode-line-update))
 
 (defun magik-session-drag-n-drop-load ()

@@ -1,3 +1,5 @@
+;; -*- mode: eask; lexical-binding: t -*-
+
 (package "magik-mode"
          "0.4.1"
          "Emacs major mode for Smallworld Magik files")
@@ -14,7 +16,6 @@
 (source "melpa")
 
 (depends-on "emacs" "24.4")
-(depends-on "auto-complete")
 (depends-on "compat")
 (depends-on "flycheck")
 (depends-on "yasnippet")

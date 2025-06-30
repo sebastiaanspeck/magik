@@ -26,6 +26,7 @@
   (require 'magik-session))
 
 (require 'compat)
+(require 'yasnippet)
 
 (defgroup magik-module nil
   "Customise Magik module.def files group."
@@ -34,12 +35,12 @@
 
 (defcustom magik-module-option-save-magikc t
   "*If t, save .magikc files when loading module."
-  :group 'smallworld
+  :group 'magik-module
   :type  'boolean)
 
 (defcustom magik-module-option-force-reload t
   "*If t, save .magikc files when loading module."
-  :group 'smallworld
+  :group 'magik-module
   :type  'boolean)
 
 ;; Imenu configuration
@@ -48,26 +49,68 @@
   "Imenu generic expression for Magik Message mode.
 See `imenu-generic-expression'.")
 
+(defvar magik-module-keywords
+  '("condition_message_accesor" "description" "do_not_translate" "hidden" "install_requires" "language" "messages" "optional" "required_by" "requires_datamodel" "requires_java" "requires" "tests_modules" "test" "templates" "end")
+  "List of Magik module keywords.")
+
+(defgroup magik-module-faces nil
+  "Faces for displaying text in a Magik module.def file."
+  :group 'magik-module)
+
+(defface magik-module-base-version-face
+  '((t :inherit magik-number-face))
+  "Font Lock mode face used to display the base version."
+  :group 'magik-module-faces)
+
+(defface magik-module-current-version-face
+  '((t :inherit magik-number-face))
+  "Font Lock mode face used to display the current version."
+  :group 'magik-module-faces)
+
+(defface magik-module-keyword-face
+  '((t :inherit magik-keyword-statements-face))
+  "Font Lock mode face used to display a keyword."
+  :group 'magik-module-faces)
+
+(defface magik-module-language-id-face
+  '((t :inherit magik-constant-face))
+  "Font Lock mode face used to display a language id."
+  :group 'magik-module-faces)
+
+(defface magik-module-name-face
+  '((t :inherit magik-label-face))
+  "Font Lock mode face used to display the module name."
+  :group 'magik-module-faces)
+
 ;; Font-lock configuration
 (defcustom magik-module-font-lock-keywords
   (list
-   '("^end\\s-*$" . font-lock-keyword-face)
-   '("^hidden$" . font-lock-keyword-face)
-   '("^\\(language\\)\\s-+\\(\\sw+\\)"
-     (1 font-lock-keyword-face)
-     (2 font-lock-type-face))
-   '("^\\(\\sw+\\)\\s-*$" . font-lock-variable-name-face)
-   '("^\\(\\sw+\\s-*\\sw*\\)\\s-*\\([0-9]*\\s-*[0-9]*\\)"
-     (1 font-lock-function-name-face)
-     (2 font-lock-constant-face)))
+   (list (concat "^\\<\\(" (mapconcat 'identity magik-module-keywords "\\|") "\\)") 0 ''magik-module-keyword-face t)
+   '("^\\(\\sw+\\)\\s-*$"
+     (1 'magik-module-name-face))
+   '("^\\(\\sw+\\)\\s-+\\([0-9]+\\(?:\\s-*[0-9]+\\)?\\)"
+     (1 'magik-module-name-face)
+     (2 'magik-number-face)))
   "Default fontification of module.def files."
-  :group 'module
+  :group 'magik-module
   :type 'sexp)
 
 (defun magik-module-customize ()
   "Open Customization buffer for Module Mode."
   (interactive)
   (customize-group 'magik-module))
+
+(defun magik-module-yas-maybe-expand ()
+  "Expand yasnippet if possible, otherwise insert a space.
+Prevents expansion inside indented areas."
+  (interactive)
+  (when (or (= 1 (point))
+            (not (member
+                  (get-text-property (- (point) 1) 'face)
+                  '(magik-module-keyword-face magik-module-name-face)))
+            (not (yas-expand)))
+    (self-insert-command 1)))
+
 
 ;;;###autoload
 (define-derived-mode magik-module-mode nil "Module"
@@ -292,6 +335,7 @@ Called by `magik-session-drag-n-drop-load' when a Module FILENAME is dropped."
   (fset 'magik-module-f2-map   magik-module-f2-map)
 
   (define-key magik-module-mode-map [f2]    'magik-module-f2-map)
+  (define-key magik-module-mode-map " "     'magik-module-yas-maybe-expand)
 
   (define-key magik-module-f2-map   "b"     'magik-module-transmit-buffer)
   (define-key magik-module-f2-map   "c"     'magik-module-compile-messages)

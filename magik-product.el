@@ -25,6 +25,8 @@
   (require 'magik-utils)
   (require 'magik-session))
 
+(require 'yasnippet)
+
 (defgroup magik-product nil
   "Customise Magik product.def files group."
   :group 'magik
@@ -33,29 +35,63 @@
 ;; Imenu configuration
 (defvar magik-product-imenu-generic-expression
   '((nil "^\\(\\sw+\\)\\s-*\n\\(.\\|\n\\)*\nend\\s-*$" 1))
-  "Imenu generic expression for Magik Message mode.
+  "Imenu generic expression for Magik Product mode.
 See `imenu-generic-expression'.")
+
+(defvar magik-product-keywords
+  '("description" "do_not_translate" "requires" "title" "version" "end")
+  "List of Magik product keywords.")
+
+(defgroup magik-product-faces nil
+  "Faces for displaying text in a Magik module.def file."
+  :group 'magik-module)
+
+(defface magik-product-keyword-face
+  '((t :inherit magik-keyword-statements-face))
+  "Font Lock mode face used to display a keyword."
+  :group 'magik-product-faces)
+
+(defface magik-product-name-face
+  '((t :inherit magik-label-face))
+  "Font Lock mode face used to display the product name."
+  :group 'magik-product-faces)
+
+(defface magik-product-type-face
+  '((t :inherit magik-class-face))
+  "Font Lock mode face used to display a product type."
+  :group 'magik-product-faces)
 
 ;; Font-lock configuration
 (defcustom magik-product-font-lock-keywords
   (list
-   '("^end\\s-*$" . font-lock-keyword-face)
-   '("^hidden$" . font-lock-keyword-face)
-   '("^\\(language\\)\\s-+\\(\\sw+\\)"
-     (1 font-lock-keyword-face)
-     (2 font-lock-type-face))
-   '("^\\(\\sw+\\)\\s-*$" . font-lock-variable-name-face)
-   '("^\\(\\sw+\\s-*\\sw*\\)\\s-*\\([0-9]*\\s-*[0-9]*\\)"
-     (1 font-lock-function-name-face)
-     (2 font-lock-constant-face)))
+   '("^\\(\\sw+\\)\\s-*$" . 'magik-product-name-face)
+   '("^\\(\\sw+\\)\\s-*\\(config_product\\|customisation_product\\|layered_product\\)"
+     (1 'magik-product-name-face)
+     (2 'magik-product-type-face))
+   '("^\\(version\\)\\s-*\\([0-9]+\\(?:\\.[0-9]+\\)?\\(?:\\.[0-9]+\\)?\\)\\(.*\\)"
+     (1 'magik-product-keyword-face)
+     (2 'magik-number-face)
+     (3 'magik-comment-face))
+   (list (concat "^\\<\\(" (mapconcat 'identity magik-product-keywords "\\|") "\\)") 0 ''magik-product-keyword-face t))
   "Default fontification of product.def files."
-  :group 'product
+  :group 'magik-product
   :type 'sexp)
 
 (defun magik-product-customize ()
   "Open Customization buffer for Product Mode."
   (interactive)
-  (customize-group 'product))
+  (customize-group 'magik-product))
+
+(defun magik-product-yas-maybe-expand ()
+  "Expand yasnippet if possible, otherwise insert a space.
+Prevents expansion inside indented areas."
+  (interactive)
+  (when (or (= 1 (point))
+            (not (member
+                  (get-text-property (- (point) 1) 'face)
+                  '(magik-product-keyword-face magik-product-name-face magik-product-type-face)))
+            (not (yas-expand)))
+    (self-insert-command 1)))
 
 ;;;###autoload
 (define-derived-mode magik-product-mode nil "Product"
@@ -159,6 +195,7 @@ Called by `magik-session-drag-n-drop-load' when a Product FILENAME is dropped."
   (fset 'magik-product-f2-map   magik-product-f2-map)
 
   (define-key magik-product-mode-map [f2]    'magik-product-f2-map)
+  (define-key magik-product-mode-map " "     'magik-product-yas-maybe-expand)
 
   (define-key magik-product-f2-map    "b"    'magik-product-transmit-buffer)
   (define-key magik-product-f2-map    "r"    'magik-product-reinitialise))

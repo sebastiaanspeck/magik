@@ -351,6 +351,18 @@ Returns nil if point is inside a comment or string."
                          (memq pre-dot '(?\s ?\t ?\n ?\( ?, ?\;)))))
           (cons beg end))))))
 
+(defun magik-completion--global-prefix-p (beg prefix)
+  "Return non-nil if PREFIX starting at BEG is eligible for global completion.
+This excludes `_' keywords and slot/method access after a `.'."
+  (not (or (string-prefix-p "_" prefix)
+           (and (> beg (point-min))
+                (eq (char-before beg) ?.)))))
+
+(defun magik-completion--kind-annotation (kind)
+  "Return an :annotation-function labeling candidates \"(magik-KIND)\"."
+  (let ((text (format " (magik-%s)" kind)))
+    (lambda (_) text)))
+
 ;;; --- CAPF functions ---
 
 (defun magik-completion-at-point-keywords ()
@@ -363,7 +375,8 @@ Returns nil if point is inside a comment or string."
         (when (string-prefix-p "_" prefix)
           (list beg end magik-completion--keywords
                 :exclusive 'no
-                :company-kind (lambda (_) 'keyword)))))))
+                :company-kind (lambda (_) 'keyword)
+                :annotation-function (magik-completion--kind-annotation 'keyword)))))))
 
 (defun magik-completion-at-point-builtins ()
   "Completion-at-point function for Magik built-in names."
@@ -371,12 +384,11 @@ Returns nil if point is inside a comment or string."
     (when-let* ((bounds (magik-completion--bounds)))
       (let ((beg (car bounds))
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (unless (or (string-prefix-p "_" prefix)
-                    (and (> beg (point-min))
-                         (eq (char-before beg) ?.)))
+        (when (magik-completion--global-prefix-p beg prefix)
           (list beg (cdr bounds) magik-completion--builtins
                 :exclusive 'no
-                :company-kind (lambda (_) 'constant)))))))
+                :company-kind (lambda (_) 'constant)
+                :annotation-function (magik-completion--kind-annotation 'constant)))))))
 
 (defun magik-completion-at-point-variables ()
   "Completion-at-point function for local variables and parameters."
@@ -384,13 +396,12 @@ Returns nil if point is inside a comment or string."
     (when-let* ((bounds (magik-completion--bounds)))
       (let ((beg (car bounds))
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (unless (or (string-prefix-p "_" prefix)
-                    (and (> beg (point-min))
-                         (eq (char-before beg) ?.)))
+        (when (magik-completion--global-prefix-p beg prefix)
           (when-let* ((vars (magik-completion--scan-local-variables)))
             (list beg (cdr bounds) vars
                   :exclusive 'no
-                  :company-kind (lambda (_) 'variable))))))))
+                  :company-kind (lambda (_) 'variable)
+                  :annotation-function (magik-completion--kind-annotation 'variable))))))))
 
 (defun magik-completion-at-point-slots ()
   "Completion-at-point function for exemplar slot references."
@@ -398,7 +409,8 @@ Returns nil if point is inside a comment or string."
               (slots (magik-completion--scan-slots)))
     (list (car bounds) (cdr bounds) slots
           :exclusive 'no
-          :company-kind (lambda (_) 'field))))
+          :company-kind (lambda (_) 'slot)
+          :annotation-function (magik-completion--kind-annotation 'slot))))
 
 ;;; --- Class Browser integration ---
 
@@ -841,13 +853,18 @@ Completing a key expands the snippet template."
 (defun magik-completion-at-point-snippets ()
   "Completion-at-point function for yasnippet template keys."
   (when magik-completion-enable-snippets
-    (when-let* ((bounds (magik-completion--bounds))
-                (templates (magik-completion--snippet-templates)))
-      (list (car bounds) (cdr bounds)
-            (delq nil (mapcar #'yas--template-key templates))
-            :exclusive 'no
-            :company-kind (lambda (_) 'snippet)
-            :exit-function #'magik-completion--snippet-exit-function))))
+    (when-let* ((bounds (magik-completion--bounds)))
+      (let ((beg (car bounds))
+            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
+        (when (magik-completion--global-prefix-p beg prefix)
+          (when-let* ((templates (magik-completion--snippet-templates)))
+            (list beg (cdr bounds)
+                  (delq nil (mapcar #'yas--template-key templates))
+                  :exclusive 'no
+                  :company-kind (lambda (_) 'snippet)
+                  :annotation-function (magik-completion--kind-annotation 'snippet)
+                  :exit-function #'magik-completion--snippet-exit-function
+                  )))))))
 
 ;;; --- Yasnippet post-completion ---
 
@@ -925,8 +942,9 @@ Inserts parameters as yasnippet when STATUS is `finished'."
                   :company-kind (lambda (_) 'method)
                   :annotation-function
                   (lambda (c)
-                    (when-let* ((ann (get-text-property 0 'magik-annotation c)))
-                      (concat " " ann)))
+                    (concat (when-let* ((ann (get-text-property 0 'magik-annotation c)))
+                              (concat " " ann))
+                            " (magik-method)"))
                   :company-doc-buffer #'magik-completion--doc-buffer
                   :exit-function #'magik-completion--exit-function)))))))
 
@@ -936,14 +954,14 @@ Inserts parameters as yasnippet when STATUS is `finished'."
     (when-let* ((bounds (magik-completion--bounds)))
       (let ((beg (car bounds))
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (unless (or (string-prefix-p "_" prefix)
-                    ;; Not after a dot — that's a method, not a class
-                    (and (> beg (point-min))
-                         (eq (char-before beg) ?.)))
+        (when (magik-completion--global-prefix-p beg prefix)
           (when-let* ((classes (magik-completion--query-classes)))
             (list beg (cdr bounds) classes
                   :exclusive 'no
-                  :company-kind (lambda (_) 'class))))))))
+                  :company-kind (lambda (_) 'class)
+                  :annotation-function (magik-completion--kind-annotation 'class)
+                  :company-doc-buffer #'magik-completion--class-doc-buffer
+                  )))))))
 
 (defun magik-completion-at-point-globals ()
   "Completion-at-point function for globals/dynamics via CB."
@@ -954,7 +972,9 @@ Inserts parameters as yasnippet when STATUS is `finished'."
           (when-let* ((globals (magik-completion--query-globals)))
             (list (car bounds) (cdr bounds) globals
                   :exclusive 'no
-                  :company-kind (lambda (_) 'variable))))))))
+                  :company-kind (lambda (_) 'variable)
+                  :annotation-function (magik-completion--kind-annotation 'variable)
+                  :company-doc-buffer #'magik-completion--doc-buffer)))))))
 
 (defun magik-completion-at-point-global-procedures ()
   "Completion-at-point function for global procedures via CB."
@@ -962,14 +982,14 @@ Inserts parameters as yasnippet when STATUS is `finished'."
     (when-let* ((bounds (magik-completion--bounds)))
       (let ((beg (car bounds))
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (unless (or (string-prefix-p "_" prefix)
-                    (and (> beg (point-min))
-                         (eq (char-before beg) ?.)))
+        (when (magik-completion--global-prefix-p beg prefix)
           (when-let* ((global-procedures (magik-completion--query-globals)))
             (list beg (cdr bounds) global-procedures
                   :exclusive 'no
                   :exit-function #'magik-completion--exit-function
-                  :company-kind (lambda (_) 'method))))))))
+                  :company-kind (lambda (_) 'method)
+                  :annotation-function (magik-completion--kind-annotation 'method)
+                  :company-doc-buffer #'magik-completion--doc-buffer)))))))
 
 ;;; --- Condition completion ---
 
@@ -1020,7 +1040,8 @@ Returns (BEG . END) of the condition name being typed, or nil."
                 (conditions (magik-completion--query-conditions)))
       (list (car bounds) (cdr bounds) conditions
             :exclusive 'no
-            :company-kind (lambda (_) 'enum-member)))))
+            :company-kind (lambda (_) 'enum-member)
+            :annotation-function (magik-completion--kind-annotation 'enum-member)))))
 
 ;;; --- Cache invalidation ---
 

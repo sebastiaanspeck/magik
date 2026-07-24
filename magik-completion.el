@@ -426,6 +426,15 @@ This excludes `_' keywords and slot/method access after a `.'."
 (defvar-local magik-completion--cb-filter-str ""
   "Accumulator for CB process filter output.")
 
+(defvar-local magik-completion--cb-ready-p nil
+  "When non-nil, a predicate checking whether the current query's
+response (`magik-completion--cb-filter-str') is complete.  Used for
+queries whose responses aren't signalled by a control character.")
+
+(defvar-local magik-completion--cb-parse-fn nil
+  "When non-nil, the parser to use for the current query's response,
+overriding the default control-character dispatch.")
+
 (defvar magik-completion--class-cache nil
   "Cache: list of all class/exemplar names from CB.")
 
@@ -519,7 +528,9 @@ Returns the process object or nil if it cannot be started."
 (defun magik-completion--cb-filter (proc str)
   "Process filter for the completion CB process PROC.
 Accumulates STR until a control char signals end of output,
-then parses the temp file."
+then parses the temp file.  When `magik-completion--cb-ready-p' is set,
+uses it and `magik-completion--cb-parse-fn' instead, for queries whose
+responses come directly over the connection with no control char."
   (when-let* ((buf (process-buffer proc))
               (_ (buffer-live-p buf)))
     (with-current-buffer buf
@@ -529,6 +540,13 @@ then parses the temp file."
                                           magik-cb-coding-system
                                         'utf-8)))
           (cond
+           (magik-completion--cb-ready-p
+            (when (funcall magik-completion--cb-ready-p magik-completion--cb-filter-str)
+              (setq magik-completion--cb-candidates
+                    (funcall magik-completion--cb-parse-fn magik-completion--cb-filter-str)
+                    magik-completion--cb-filter-str ""
+                    magik-completion--cb-ready-p nil
+                    magik-completion--cb-parse-fn nil)))
            ;; \C-e signals method list output ready
            ((string-match "\C-e" magik-completion--cb-filter-str)
             (setq magik-completion--cb-filter-str "")
@@ -641,28 +659,81 @@ Returns a list (REQUIRED OPTIONAL GATHER)."
 
 (defun magik-completion--parse-classes ()
   "Parse class/family output in current buffer.
-Returns a list of class name strings."
+Returns a list of class name strings, each propertized with its
+package under `magik-package' (e.g. \"sw\" for \"sw:rope\')."
   (let ((candidates '())
-        (regexp "\\(\\S-+:\\)\\(\\S-+\\)"))
+        (regexp "\\(\\S-+\\):\\(\\S-+\\)"))
     (goto-char (point-min))
     (save-match-data
       (while (re-search-forward regexp nil t)
-        (let ((name (match-string-no-properties 2)))
+        (let ((package (match-string-no-properties 1))
+              (name (match-string-no-properties 2)))
           (unless (member name candidates)
-            (push name candidates)))))
+            (push (propertize name 'magik-package package) candidates)))))
     (nreverse candidates)))
+
+;;; --- Class comment queries ---
+;;
+;; `get_class_info comments <class>' answers directly over the connection
+;; with no control character: a line count N, then exactly N lines of
+;; comment text (or a single "method finder: Invalid class" line for an
+;; unknown class).  This needs its own readiness/parsing logic instead of
+;; the usual \C-e / \C-c + temp-file dispatch.
+
+(defun magik-completion--class-comment-nth-line-end (str n)
+  "Return the buffer position in STR just after its Nth newline.
+Returns nil if STR has fewer than N newlines."
+  (let ((pos 0))
+    (catch 'done
+      (dotimes (_ n)
+        (let ((next (string-match "\n" str pos)))
+          (unless next (throw 'done nil))
+          (setq pos (1+ next))))
+      pos)))
+
+(defun magik-completion--class-comment-ready-p (str)
+  "Return non-nil once STR is a complete get_class_info comments response."
+  (when-let* ((first-nl (string-match "\n" str)))
+    (let ((count-str (substring str 0 first-nl)))
+      (if (string-match-p "\\`[0-9]+\\'" count-str)
+          (magik-completion--class-comment-nth-line-end
+           str (1+ (string-to-number count-str)))
+        t))))
+
+(defun magik-completion--parse-class-comment (str)
+  "Extract the comment text from a get_class_info comments response STR.
+Returns nil if the class has no comment or wasn't found."
+  (when-let* ((first-nl (string-match "\n" str))
+              (count-str (substring str 0 first-nl))
+              ((string-match-p "\\`[0-9]+\\'" count-str))
+              (n (string-to-number count-str))
+              ((not (zerop n)))
+              (body-end (magik-completion--class-comment-nth-line-end str (1+ n))))
+    (string-trim (substring str (1+ first-nl) body-end))))
+
+(defun magik-completion--query-class-comment (class)
+  "Query CLASS's own comment from the CB, or nil if it has none."
+  (magik-completion--cb-query
+   (concat "get_class_info comments " class "\n")
+   #'magik-completion--class-comment-ready-p
+                                        #'magik-completion--parse-class-comment
+   ))
 
 ;;; --- CB synchronous queries ---
 
-(defun magik-completion--cb-query (command)
+(defun magik-completion--cb-query (command &optional ready-p parse-fn)
   "Send COMMAND string to the CB process and wait for a response.
-Returns the candidates list or nil on timeout."
+Returns the candidates list or nil on timeout.
+READY-P and PARSE-FN, when given, are used instead of the default
+control-character dispatch — see `magik-completion--cb-filter'."
   (when-let* ((proc (magik-completion--ensure-cb-process))
               (buf (process-buffer proc))
               (_ (buffer-live-p buf)))
     (with-current-buffer buf
       (setq magik-completion--cb-candidates 'pending
-            magik-completion--cb-filter-str ""))
+            magik-completion--cb-filter-str ""
+            magik-completion--cb-ready-p ready-p
+            magik-completion--cb-parse-fn parse-fn))
     (process-send-string proc command)
     ;; Synchronous wait with timeout
     (let ((deadline (+ (float-time) magik-completion-cb-timeout)))
@@ -711,7 +782,7 @@ Returns list of method name strings."
     (let* ((cmd (concat "method_name ^\n"
                         "unadd class \nadd class <global>\n"
                         "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
-                        "override_flags\nshow_classes\nshow_args\n"
+                        "override_flags\nshow_classes\nshow_args\nshow_comments\n"
                         "print_curr_methods\nshow_topics\n"))
            (result (magik-completion--cb-query cmd)))
       (when result
@@ -907,6 +978,23 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
 (defun magik-completion--doc-buffer (candidate)
   "Return a documentation buffer for CANDIDATE, or nil if none available."
   (when-let* ((doc (get-text-property 0 'magik-documentation candidate)))
+    (with-current-buffer (get-buffer-create " *magik-completion-doc*")
+      (erase-buffer)
+      (insert doc)
+      (current-buffer))))
+
+(defun magik-completion--qualified-class-name (candidate)
+  "Return CANDIDATE qualified with its `magik-package' property, if any.
+`get_class_info' requires a package-qualified class name (e.g. \"sw:rope\');
+CANDIDATE alone (e.g. \"rope\') is not enough."
+  (if-let* ((package (get-text-property 0 'magik-package candidate)))
+      (concat package ":" candidate)
+    candidate))
+
+(defun magik-completion--class-doc-buffer (candidate)
+  "Return a documentation buffer for class CANDIDATE, or nil if none available."
+  (when-let* ((doc (magik-completion--query-class-comment
+                     (magik-completion--qualified-class-name candidate))))
     (with-current-buffer (get-buffer-create " *magik-completion-doc*")
       (erase-buffer)
       (insert doc)

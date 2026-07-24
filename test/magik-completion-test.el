@@ -300,6 +300,36 @@ $
     (should-not (magik-completion--exemplar-definition-region ""))
     (should-not (magik-completion--exemplar-definition-region nil))))
 
+;;; Package-qualified completion
+
+(ert-deftest magik-completion--typed-package--qualified-prefix ()
+  "A `package:name' prefix returns the package."
+  (should (equal (magik-completion--typed-package "sw:pseu") "sw")))
+
+(ert-deftest magik-completion--typed-package--leading-colon-is-not-a-package ()
+  "A leading colon (symbol literal, e.g. \":p\") is not a package qualifier."
+  (should-not (magik-completion--typed-package ":p")))
+
+(ert-deftest magik-completion--typed-package--no-colon-returns-nil ()
+  "A prefix with no colon has no package qualifier."
+  (should-not (magik-completion--typed-package "pseu")))
+
+(ert-deftest magik-completion-at-point-builtins--symbol-literal-offers-nothing ()
+  "Typing a symbol literal like \":p\" offers no builtin completions."
+  (with-temp-buffer
+    (magik-mode)
+    (insert ":p")
+    (let ((capf (magik-completion-at-point-builtins)))
+      (should-not (try-completion ":p" (nth 2 capf) nil)))))
+
+(ert-deftest magik-completion-at-point-builtins--package-qualified-prefix-matches ()
+  "Typing \"sw:rop\" still offers package-qualified builtin completions."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "sw:rop")
+    (let ((capf (magik-completion-at-point-builtins)))
+      (should (try-completion "sw:rop" (nth 2 capf) nil)))))
+
 ;;; Yasnippet template candidates
 
 (defmacro magik-completion-test--with-snippet-buffer (&rest body)

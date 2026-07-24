@@ -362,8 +362,11 @@ This excludes `_' keywords and slot/method access after a `.'."
                 (eq (char-before beg) ?.)))))
 
 (defun magik-completion--typed-package (prefix)
-  "Return the package qualifier typed before a `:' in PREFIX, or nil."
-  (when-let* ((colon (string-match ":" prefix)))
+  "Return the package qualifier typed before a `:' in PREFIX, or nil.
+A leading colon with nothing before it (e.g. \":p\") is a symbol
+literal, not a package qualifier, so that case returns nil."
+  (when-let* ((colon (string-match ":" prefix))
+              ((> colon 0)))
     (substring prefix 0 colon)))
 
 (defun magik-completion--qualify-candidate (package candidate)

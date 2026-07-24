@@ -95,12 +95,15 @@ Set to nil before mode activation to disable, or use
   "List of Magik language keywords for completion.")
 
 (defconst magik-completion--builtins
-  '("bag" "char16_vector" "concurrent_hash_map" "condition" "date"
-    "equality_hash_table" "equality_set" "float" "gis_program_manager"
-    "hash_table" "integer" "property_list" "queue" "rope" "set"
-    "simple_vector" "smallworld_product" "sorted_collection" "stack"
-    "sw_module_manager" "symbol" "system")
-  "List of commonly used Magik built-in names for completion.")
+  (mapcar (lambda (name) (propertize name 'magik-package "sw"))
+          '("bag" "char16_vector" "concurrent_hash_map" "condition" "date"
+            "equality_hash_table" "equality_set" "float" "gis_program_manager"
+            "hash_table" "integer" "property_list" "queue" "rope" "set"
+            "simple_vector" "smallworld_product" "sorted_collection" "stack"
+            "sw_module_manager" "symbol" "system"))
+  "List of commonly used Magik built-in names for completion.
+All of these live in the `sw' package, so each name is tagged with
+that via a `magik-package' text property, for doc-buffer lookups.")
 
 ;;; --- Variable scanning ---
 
@@ -358,6 +361,36 @@ This excludes `_' keywords and slot/method access after a `.'."
            (and (> beg (point-min))
                 (eq (char-before beg) ?.)))))
 
+(defun magik-completion--typed-package (prefix)
+  "Return the package qualifier typed before a `:' in PREFIX, or nil."
+  (when-let* ((colon (string-match ":" prefix)))
+    (substring prefix 0 colon)))
+
+(defun magik-completion--qualify-candidate (package candidate)
+  "Return CANDIDATE prefixed with \"PACKAGE:\".
+Carries over CANDIDATE's own text properties onto the whole result,
+so code inspecting properties at position 0 (e.g. `magik-package',
+`magik-args') keeps working regardless of the added qualifier."
+  (let ((qualified (concat package ":" candidate)))
+    (add-text-properties 0 (length qualified) (text-properties-at 0 candidate) qualified)
+    qualified))
+
+(defun magik-completion--package-agnostic-table (candidates)
+  "Return a completion table over CANDIDATES (bare names) that also
+offers/matches package-qualified forms like \"sw:rope\" when the typed
+text has a `package:' qualifier, by generating qualified candidate
+strings on the fly for that input (see
+`magik-completion--qualify-candidate'), so the candidate text itself
+already matches what's in the buffer and a plain accept just works."
+  (lambda (string pred action)
+    (complete-with-action
+     action
+     (if-let* ((package (magik-completion--typed-package string)))
+         (mapcar (lambda (c) (magik-completion--qualify-candidate package c))
+                 candidates)
+       candidates)
+     string pred)))
+
 (defun magik-completion--kind-annotation (kind)
   "Return an :annotation-function labeling candidates \"(magik-KIND)\"."
   (let ((text (format " (magik-%s)" kind)))
@@ -385,10 +418,12 @@ This excludes `_' keywords and slot/method access after a `.'."
       (let ((beg (car bounds))
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
         (when (magik-completion--global-prefix-p beg prefix)
-          (list beg (cdr bounds) magik-completion--builtins
+          (list beg (cdr bounds)
+                (magik-completion--package-agnostic-table magik-completion--builtins)
                 :exclusive 'no
                 :company-kind (lambda (_) 'constant)
-                :annotation-function (magik-completion--kind-annotation 'constant)))))))
+                :annotation-function (magik-completion--kind-annotation 'constant)
+                :company-doc-buffer #'magik-completion--class-doc-buffer))))))
 
 (defun magik-completion-at-point-variables ()
   "Completion-at-point function for local variables and parameters."
@@ -716,8 +751,7 @@ Returns nil if the class has no comment or wasn't found."
   (magik-completion--cb-query
    (concat "get_class_info comments " class "\n")
    #'magik-completion--class-comment-ready-p
-                                        #'magik-completion--parse-class-comment
-   ))
+   #'magik-completion--parse-class-comment))
 
 ;;; --- CB synchronous queries ---
 
@@ -984,12 +1018,18 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
       (current-buffer))))
 
 (defun magik-completion--qualified-class-name (candidate)
-  "Return CANDIDATE qualified with its `magik-package' property, if any.
-`get_class_info' requires a package-qualified class name (e.g. \"sw:rope\');
-CANDIDATE alone (e.g. \"rope\') is not enough."
-  (if-let* ((package (get-text-property 0 'magik-package candidate)))
-      (concat package ":" candidate)
-    candidate))
+  "Return CANDIDATE qualified with its package, e.g. \"sw:rope\'.
+CANDIDATE may already be package-qualified — e.g. when it was
+produced by `magik-completion--package-agnostic-table' for a
+package-qualified prefix — in which case it's used as-is; otherwise
+this falls back to its `magik-package' text property.
+`get_class_info' requires a package-qualified class name; CANDIDATE
+alone (e.g. \"rope\') is not enough."
+  (cond
+   ((string-match-p ":" candidate) candidate)
+   ((get-text-property 0 'magik-package candidate)
+    (concat (get-text-property 0 'magik-package candidate) ":" candidate))
+   (t candidate)))
 
 (defun magik-completion--class-doc-buffer (candidate)
   "Return a documentation buffer for class CANDIDATE, or nil if none available."
@@ -1044,12 +1084,12 @@ Inserts parameters as yasnippet when STATUS is `finished'."
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
         (when (magik-completion--global-prefix-p beg prefix)
           (when-let* ((classes (magik-completion--query-classes)))
-            (list beg (cdr bounds) classes
+            (list beg (cdr bounds)
+                  (magik-completion--package-agnostic-table classes)
                   :exclusive 'no
                   :company-kind (lambda (_) 'class)
                   :annotation-function (magik-completion--kind-annotation 'class)
-                  :company-doc-buffer #'magik-completion--class-doc-buffer
-                  )))))))
+                  :company-doc-buffer #'magik-completion--class-doc-buffer)))))))
 
 (defun magik-completion-at-point-globals ()
   "Completion-at-point function for globals/dynamics via CB."
@@ -1072,7 +1112,8 @@ Inserts parameters as yasnippet when STATUS is `finished'."
             (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
         (when (magik-completion--global-prefix-p beg prefix)
           (when-let* ((global-procedures (magik-completion--query-globals)))
-            (list beg (cdr bounds) global-procedures
+            (list beg (cdr bounds)
+                  (magik-completion--package-agnostic-table global-procedures)
                   :exclusive 'no
                   :exit-function #'magik-completion--exit-function
                   :company-kind (lambda (_) 'method)

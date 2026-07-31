@@ -473,11 +473,24 @@ queries whose responses aren't signalled by a control character.")
   "When non-nil, the parser to use for the current query's response,
 overriding the default control-character dispatch.")
 
+(defvar-local magik-completion--cb-on-response nil
+  "Callback for the in-flight query; see `magik-completion--cb-dispatch'.")
+
+(defvar-local magik-completion--cb-queue nil
+  "FIFO of (COMMAND READY-P PARSE-FN ON-RESPONSE) queries waiting
+behind the in-flight one on this connection.")
+
+(defvar-local magik-completion--cb-generation 0
+  "Bumped on every dispatch; lets a timeout tell if it's stale.")
+
 (defvar magik-completion--class-cache nil
   "Cache: list of all class/exemplar names from CB.")
 
 (defvar magik-completion--class-cache-loaded nil
   "Non-nil when the class cache has been populated.")
+
+(defvar magik-completion--class-fetch-pending nil
+  "Non-nil while a background class-cache fetch is in flight.")
 
 (defvar magik-completion--global-cache nil
   "Cache: list of all global/dynamic names from CB.")
@@ -485,17 +498,25 @@ overriding the default control-character dispatch.")
 (defvar magik-completion--global-cache-loaded nil
   "Non-nil when the global cache has been populated.")
 
+(defvar magik-completion--global-fetch-pending nil
+  "Non-nil while a background global-cache fetch is in flight.")
+
 (defvar magik-completion--method-cache nil
   "Cache: cons (KEY . CANDIDATES) for method completion.
 KEY is \"class.first-char\" to detect when to re-query.")
+
+(defvar magik-completion--method-fetch-pending nil
+  "Cache key currently being fetched in the background, or nil.")
 
 (defcustom magik-completion-enable-cb t
   "When non-nil, use the Class Browser for method/class/global completion."
   :type 'boolean
   :group 'magik-completion)
 
-(defcustom magik-completion-cb-timeout 2.0
-  "Timeout in seconds to wait for CB process responses."
+(defcustom magik-completion-cb-timeout 20.0
+  "Seconds to wait for a CB response before giving up and restarting.
+Non-blocking, so this can be generous: a fresh CB can be slow to
+answer its first query while `method_finder' loads its database."
   :type 'number
   :group 'magik-completion)
 
@@ -534,16 +555,34 @@ KEY is \"class.first-char\" to detect when to re-query.")
                 (_ (get-buffer-process buf)))
       buf)))
 
+(defun magik-completion--gis-session-idle-p (gis-buf)
+  "Return non-nil if the session in GIS-BUF is idle at its prompt.
+Starting a CB connection blocks until the session answers, so check
+this first and skip the attempt while busy (e.g. mid-startup)."
+  (with-current-buffer gis-buf
+    (and (boundp 'magik-session-prompt)
+         magik-session-prompt
+         (save-excursion
+           (goto-char (point-max))
+           (and (re-search-backward magik-session-prompt nil t)
+                (save-match-data
+                  (save-excursion
+                    (goto-char (match-end 0))
+                    (skip-chars-forward " \t\n")
+                    (eobp))))))))
+
 (defun magik-completion--ensure-cb-process ()
-  "Ensure a dedicated CB process is running for completion.
-Returns the process object or nil if it cannot be started."
+  "Ensure a dedicated CB process is running; return it, or nil if it
+can't be started right now (including a busy session)."
   (when (and magik-completion-enable-cb
              (require 'magik-cb nil t))
     (if (and magik-completion--cb-process
              (process-live-p magik-completion--cb-process))
         magik-completion--cb-process
-      ;; Try to start one
-      (when-let* ((gis-buf (magik-completion--gis-buffer)))
+      ;; Try to start one, but only once the session is idle; otherwise
+      ;; this would block inside `magik-cb-get-process-create'.
+      (when-let* ((gis-buf (magik-completion--gis-buffer))
+                  ((magik-completion--gis-session-idle-p gis-buf)))
         (let* ((smallworld-gis (buffer-local-value
                                 'magik-smallworld-gis (get-buffer gis-buf)))
                (cb-buf (magik-completion--cb-buffer)))
@@ -558,6 +597,14 @@ Returns the process object or nil if it cannot be started."
                   (setq magik-completion--cb-process proc
                         magik-completion--cb-buffer-name
                         (buffer-name (process-buffer proc)))
+                  ;; Buffer may be reused after a restart; start clean.
+                  (with-current-buffer (process-buffer proc)
+                    (setq magik-completion--cb-candidates nil
+                          magik-completion--cb-filter-str ""
+                          magik-completion--cb-ready-p nil
+                          magik-completion--cb-parse-fn nil
+                          magik-completion--cb-on-response nil
+                          magik-completion--cb-queue nil))
                   proc))
             (error nil)))))))
 
@@ -580,27 +627,123 @@ responses come directly over the connection with no control char."
           (cond
            (magik-completion--cb-ready-p
             (when (funcall magik-completion--cb-ready-p magik-completion--cb-filter-str)
-              (setq magik-completion--cb-candidates
-                    (funcall magik-completion--cb-parse-fn magik-completion--cb-filter-str)
-                    magik-completion--cb-filter-str ""
-                    magik-completion--cb-ready-p nil
-                    magik-completion--cb-parse-fn nil)))
+              (let ((result (funcall magik-completion--cb-parse-fn
+                                     magik-completion--cb-filter-str)))
+                (setq magik-completion--cb-filter-str ""
+                      magik-completion--cb-ready-p nil
+                      magik-completion--cb-parse-fn nil)
+                (magik-completion--cb-deliver result))))
            ;; \C-e signals method list output ready
            ((string-match "\C-e" magik-completion--cb-filter-str)
             (setq magik-completion--cb-filter-str "")
             (let ((buffer-read-only nil))
               (erase-buffer)
               (insert-file-contents (magik-cb-temp-file-name proc) nil nil nil t))
-            (setq magik-completion--cb-candidates
-                  (magik-completion--parse-methods)))
+            (magik-completion--cb-deliver (magik-completion--parse-methods)))
            ;; \C-c signals class list output ready
            ((string-match "\C-c" magik-completion--cb-filter-str)
             (setq magik-completion--cb-filter-str "")
             (let ((buffer-read-only nil))
               (erase-buffer)
               (insert-file-contents (magik-cb-temp-file-name proc) nil nil nil t))
-            (setq magik-completion--cb-candidates
-                  (magik-completion--parse-classes))))))))
+            (magik-completion--cb-deliver (magik-completion--parse-classes))))))))
+
+;;; --- CB dispatch/delivery ---
+;;
+;; One connection, one command at a time (no request id to match a
+;; reply to); these serialize queries onto a per-connection queue and
+;; deliver each result via callback instead of blocking the caller.
+
+(defun magik-completion--cb-dispatch (buf command ready-p parse-fn on-response)
+  "Send COMMAND on the CB process owning BUF, without blocking.
+ON-RESPONSE gets the parsed result, or nil on timeout.  READY-P and
+PARSE-FN override the default dispatch, see `magik-completion--cb-filter'."
+  (let ((generation
+         (with-current-buffer buf
+           (setq magik-completion--cb-candidates 'pending
+                 magik-completion--cb-filter-str ""
+                 magik-completion--cb-ready-p ready-p
+                 magik-completion--cb-parse-fn parse-fn
+                 magik-completion--cb-on-response on-response)
+           (cl-incf magik-completion--cb-generation))))
+    (process-send-string (get-buffer-process buf) command)
+    (run-at-time magik-completion-cb-timeout nil
+                 #'magik-completion--cb-timeout buf generation)))
+
+(defun magik-completion--cb-timeout (buf generation)
+  "Give up on BUF's in-flight query if GENERATION is still current,
+restarting the connection so a late reply can't corrupt the next one."
+  (when (buffer-live-p buf)
+    (with-current-buffer buf
+      (when (and (= generation magik-completion--cb-generation)
+                 (eq magik-completion--cb-candidates 'pending))
+        (let ((callbacks (delq nil (cons magik-completion--cb-on-response
+                                         (mapcar (lambda (q) (nth 3 q))
+                                                 magik-completion--cb-queue))))
+              (proc (get-buffer-process buf)))
+          (setq magik-completion--cb-on-response nil
+                magik-completion--cb-queue nil
+                magik-completion--cb-candidates nil)
+          (when proc (delete-process proc))
+          (dolist (callback callbacks) (funcall callback nil)))))))
+
+(defun magik-completion--cb-deliver (result)
+  "Store RESULT as the in-flight query's outcome, notify its caller,
+then dispatch the next queued query on this connection, if any."
+  (setq magik-completion--cb-candidates result)
+  (when-let* ((callback magik-completion--cb-on-response))
+    (setq magik-completion--cb-on-response nil)
+    (funcall callback result))
+  (when-let* ((next (pop magik-completion--cb-queue)))
+    (apply #'magik-completion--cb-dispatch (current-buffer) next)))
+
+(defun magik-completion--cb-query-async (command callback &optional ready-p parse-fn)
+  "Send COMMAND to the CB without blocking; return t if dispatched or
+queued, nil if no CB is available.  CALLBACK gets the result later,
+with completion recomputed if still in progress.  READY-P/PARSE-FN
+override the default dispatch, see `magik-completion--cb-filter'."
+  (when-let* ((proc (magik-completion--ensure-cb-process))
+              (buf (process-buffer proc))
+              (_ (buffer-live-p buf)))
+    (let* ((requester (current-buffer))
+           (on-response
+            (lambda (result)
+              (run-at-time
+               0 nil
+               (lambda ()
+                 (when (buffer-live-p requester)
+                   (with-current-buffer requester
+                     (funcall callback result)
+                     (when (and completion-in-region-mode
+                                (fboundp 'completion-at-point))
+                       (ignore-errors (completion-at-point))))))))))
+      (if (eq (buffer-local-value 'magik-completion--cb-candidates buf) 'pending)
+          (with-current-buffer buf
+            (setq magik-completion--cb-queue
+                  (append magik-completion--cb-queue
+                          (list (list command ready-p parse-fn on-response)))))
+        (magik-completion--cb-dispatch buf command ready-p parse-fn on-response)))
+    t))
+
+(defun magik-completion--cb-cached-fetch (cache-var loaded-var pending-var command)
+  "Return CACHE-VAR's value once LOADED-VAR is set, else fetch COMMAND
+in the background (unless PENDING-VAR is already set) and return nil.
+Args are variable symbols, not values, to drive several CB caches."
+  (cond
+   ((symbol-value loaded-var) (symbol-value cache-var))
+   ((symbol-value pending-var) nil)
+   (t
+    (set pending-var t)
+    (unless (magik-completion--cb-query-async
+             command
+             (lambda (result)
+               (set pending-var nil)
+               (when result
+                 (set cache-var result)
+                 (set loaded-var t))))
+      ;; No CB available, so the callback never runs; clear it ourselves.
+      (set pending-var nil))
+    nil)))
 
 ;;; --- CB output parsing ---
 
@@ -749,83 +892,80 @@ Returns nil if the class has no comment or wasn't found."
               (body-end (magik-completion--class-comment-nth-line-end str (1+ n))))
     (string-trim (substring str (1+ first-nl) body-end))))
 
+(defvar magik-completion--class-comment-cache (make-hash-table :test #'equal)
+  "Cache: qualified class name -> its comment text (or `none') from CB.")
+
+(defvar magik-completion--class-comment-fetch-pending nil
+  "Qualified class name currently being fetched, or nil.")
+
 (defun magik-completion--query-class-comment (class)
-  "Query CLASS's own comment from the CB, or nil if it has none."
-  (magik-completion--cb-query
-   (concat "get_class_info comments " class "\n")
-   #'magik-completion--class-comment-ready-p
-   #'magik-completion--parse-class-comment))
+  "Return CLASS's own comment from the CB, caching by CLASS.
+Kicks off a background fetch and returns nil when not yet cached."
+  (let ((cached (gethash class magik-completion--class-comment-cache 'missing)))
+    (cond
+     ((eq cached 'none) nil)
+     ((not (eq cached 'missing)) cached)
+     ((equal magik-completion--class-comment-fetch-pending class) nil)
+     (t
+      (setq magik-completion--class-comment-fetch-pending class)
+      (unless (magik-completion--cb-query-async
+               (concat "get_class_info comments " class "\n")
+               (lambda (result)
+                 (setq magik-completion--class-comment-fetch-pending nil)
+                 (puthash class (or result 'none) magik-completion--class-comment-cache))
+               #'magik-completion--class-comment-ready-p
+               #'magik-completion--parse-class-comment)
+        ;; No CB available right now: nothing will clear the flag.
+        (setq magik-completion--class-comment-fetch-pending nil))
+      nil))))
 
-;;; --- CB synchronous queries ---
-
-(defun magik-completion--cb-query (command &optional ready-p parse-fn)
-  "Send COMMAND string to the CB process and wait for a response.
-Returns the candidates list or nil on timeout.
-READY-P and PARSE-FN, when given, are used instead of the default
-control-character dispatch — see `magik-completion--cb-filter'."
-  (when-let* ((proc (magik-completion--ensure-cb-process))
-              (buf (process-buffer proc))
-              (_ (buffer-live-p buf)))
-    (with-current-buffer buf
-      (setq magik-completion--cb-candidates 'pending
-            magik-completion--cb-filter-str ""
-            magik-completion--cb-ready-p ready-p
-            magik-completion--cb-parse-fn parse-fn))
-    (process-send-string proc command)
-    ;; Synchronous wait with timeout
-    (let ((deadline (+ (float-time) magik-completion-cb-timeout)))
-      (while (and (eq (buffer-local-value 'magik-completion--cb-candidates buf)
-                      'pending)
-                  (< (float-time) deadline)
-                  (process-live-p proc))
-        (accept-process-output proc 0.05)))
-    (let ((result (buffer-local-value 'magik-completion--cb-candidates buf)))
-      (if (eq result 'pending) nil result))))
+;;; --- CB queries ---
 
 (defun magik-completion--query-methods (class prefix)
-  "Query methods on CLASS starting with PREFIX from CB.
-Returns list of method name strings."
+  "Return cached methods on CLASS starting with PREFIX, else fetch in
+the background and return nil."
   (let* ((char (if (string-empty-p prefix) "" (substring prefix 0 1)))
          (cache-key (concat class "." char)))
-    ;; Use cached result if same class+char
-    (if (and magik-completion--method-cache
-             (equal cache-key (car magik-completion--method-cache)))
-        (cdr magik-completion--method-cache)
-      (let* ((cmd (concat "method_name ^" char "\n"
-                          "unadd class \nadd class " class "$\n"
-                          "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
-                          "override_flags\nshow_classes\nshow_args\nshow_comments\n"
-                          "print_curr_methods\nshow_topics\n"))
-             (result (magik-completion--cb-query cmd)))
-        (when result
-          (setq magik-completion--method-cache (cons cache-key result)))
-        result))))
+    (cond
+     ((and magik-completion--method-cache
+           (equal cache-key (car magik-completion--method-cache)))
+      (cdr magik-completion--method-cache))
+     ((equal magik-completion--method-fetch-pending cache-key) nil)
+     (t
+      (setq magik-completion--method-fetch-pending cache-key)
+      (unless (magik-completion--cb-query-async
+               (concat "method_name ^" char "\n"
+                       "unadd class \nadd class " class "$\n"
+                       "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
+                       "override_flags\nshow_classes\nshow_args\nshow_comments\n"
+                       "print_curr_methods\nshow_topics\n")
+               (lambda (result)
+                 (setq magik-completion--method-fetch-pending nil)
+                 (when result
+                   (setq magik-completion--method-cache (cons cache-key result)))))
+        ;; No CB available right now: nothing will clear the flag.
+        (setq magik-completion--method-fetch-pending nil))
+      nil))))
 
 (defun magik-completion--query-classes ()
-  "Query all classes from the CB.  Caches the result."
-  (if magik-completion--class-cache-loaded
-      magik-completion--class-cache
-    (let* ((cmd "dont_override_flags\npr_family sw:object\n")
-           (result (magik-completion--cb-query cmd)))
-      (when result
-        (setq magik-completion--class-cache result
-              magik-completion--class-cache-loaded t))
-      result)))
+  "Return all classes from the CB, fetching in the background first."
+  (magik-completion--cb-cached-fetch
+   'magik-completion--class-cache
+   'magik-completion--class-cache-loaded
+   'magik-completion--class-fetch-pending
+   "dont_override_flags\npr_family sw:object\n"))
 
 (defun magik-completion--query-globals ()
-  "Query all globals from the CB.  Caches the result."
-  (if magik-completion--global-cache-loaded
-      magik-completion--global-cache
-    (let* ((cmd (concat "method_name ^\n"
-                        "unadd class \nadd class <global>\n"
-                        "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
-                        "override_flags\nshow_classes\nshow_args\nshow_comments\n"
-                        "print_curr_methods\nshow_topics\n"))
-           (result (magik-completion--cb-query cmd)))
-      (when result
-        (setq magik-completion--global-cache result
-              magik-completion--global-cache-loaded t))
-      result)))
+  "Return all globals from the CB, fetching in the background first."
+  (magik-completion--cb-cached-fetch
+   'magik-completion--global-cache
+   'magik-completion--global-cache-loaded
+   'magik-completion--global-fetch-pending
+   (concat "method_name ^\n"
+           "unadd class \nadd class <global>\n"
+           "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
+           "override_flags\nshow_classes\nshow_args\nshow_comments\n"
+           "print_curr_methods\nshow_topics\n")))
 
 ;;; --- Exemplar type inference ---
 
@@ -987,7 +1127,7 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
            (gather-raw (get-text-property 0 'magik-gather candidate))
            (optional (and magik-completion-insert-optional-params optional-raw))
            ;; Only include gather when there are no skipped optional params
-           ;; before it — you can't pass gather args without first providing
+           ;; before it: you can't pass gather args without first providing
            ;; all positional optional args.
            (gather (and magik-completion-insert-gather-param
                         gather-raw
@@ -1022,9 +1162,9 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
 
 (defun magik-completion--qualified-class-name (candidate)
   "Return CANDIDATE qualified with its package, e.g. \"sw:rope\'.
-CANDIDATE may already be package-qualified — e.g. when it was
+CANDIDATE may already be package-qualified, e.g. when it was
 produced by `magik-completion--package-agnostic-table' for a
-package-qualified prefix — in which case it's used as-is; otherwise
+package-qualified prefix, in which case it's used as-is; otherwise
 this falls back to its `magik-package' text property.
 `get_class_info' requires a package-qualified class name; CANDIDATE
 alone (e.g. \"rope\') is not enough."
@@ -1131,6 +1271,9 @@ Inserts parameters as yasnippet when STATUS is `finished'."
 (defvar magik-completion--condition-cache-loaded nil
   "Non-nil when the condition cache has been populated.")
 
+(defvar magik-completion--condition-fetch-pending nil
+  "Non-nil while a background condition-cache fetch is in flight.")
+
 (defun magik-completion--condition-bounds ()
   "Return bounds if point is after `condition.raise(:'  or similar.
 Returns (BEG . END) of the condition name being typed, or nil."
@@ -1151,19 +1294,16 @@ Returns (BEG . END) of the condition name being typed, or nil."
             (cons beg end)))))))
 
 (defun magik-completion--query-conditions ()
-  "Query all condition names from the CB.  Caches the result."
-  (if magik-completion--condition-cache-loaded
-      magik-completion--condition-cache
-    (let* ((cmd (concat "method_name ^\n"
-                        "unadd class \nadd class <condition>\n"
-                        "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
-                        "override_flags\nshow_classes\nshow_args\n"
-                        "print_curr_methods\nshow_topics\n"))
-           (result (magik-completion--cb-query cmd)))
-      (when result
-        (setq magik-completion--condition-cache result
-              magik-completion--condition-cache-loaded t))
-      result)))
+  "Return all condition names from the CB, fetching in the background first."
+  (magik-completion--cb-cached-fetch
+   'magik-completion--condition-cache
+   'magik-completion--condition-cache-loaded
+   'magik-completion--condition-fetch-pending
+   (concat "method_name ^\n"
+           "unadd class \nadd class <condition>\n"
+           "method_cut_off " (number-to-string magik-completion-cb-max-methods) "\n"
+           "override_flags\nshow_classes\nshow_args\n"
+           "print_curr_methods\nshow_topics\n")))
 
 (defun magik-completion-at-point-conditions ()
   "Completion-at-point function for condition names after `condition.raise(:'."
@@ -1188,11 +1328,17 @@ Can be called after loading code in the session."
 Intended to be called after transmitting code to the session."
   (setq magik-completion--class-cache nil
         magik-completion--class-cache-loaded nil
+        magik-completion--class-fetch-pending nil
         magik-completion--global-cache nil
         magik-completion--global-cache-loaded nil
+        magik-completion--global-fetch-pending nil
         magik-completion--condition-cache nil
         magik-completion--condition-cache-loaded nil
-        magik-completion--method-cache nil))
+        magik-completion--condition-fetch-pending nil
+        magik-completion--method-cache nil
+        magik-completion--method-fetch-pending nil
+        magik-completion--class-comment-fetch-pending nil)
+  (clrhash magik-completion--class-comment-cache))
 
 (defun magik-completion--reset-session-state (&rest _args)
   "Invalidate caches and kill all dedicated completion CB buffers.
@@ -1211,17 +1357,19 @@ does not serve candidates from a previous session."
 ;;; --- Setup ---
 
 (defvar magik-completion--capf-functions
-  '(magik-completion-at-point-snippets
-    magik-completion-at-point-conditions
+  '(magik-completion-at-point-conditions
     magik-completion-at-point-global-procedures
     magik-completion-at-point-globals
     magik-completion-at-point-classes
     magik-completion-at-point-methods
+    magik-completion-at-point-snippets
     magik-completion-at-point-slots
     magik-completion-at-point-variables
     magik-completion-at-point-builtins
     magik-completion-at-point-keywords)
-  "List of Magik CAPF functions, lowest priority first.")
+  "List of Magik CAPF functions, lowest priority first.
+Buffer-local sources are listed last so `magik-completion--enable'
+(which prepends each entry) tries them before the CB-backed ones.")
 
 (defconst magik-completion--transmit-functions
   '(magik-product-transmit-buffer

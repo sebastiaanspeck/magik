@@ -8,6 +8,7 @@
 ;;; Code:
 
 (require 'test-helper)
+(require 'cl-lib)
 (require 'magik-completion)
 
 ;;; Helpers
@@ -136,7 +137,7 @@ GATHER a list with the gather arg name, START-SIG is \"(\" or nil."
 (ert-deftest magik-completion--build-param-snippet--optional-excluded-suppresses-gather ()
   "Gather suppressed when preceding optional params are excluded.
 Passing gather args without the optional positional arg is a positional
-error in Magik — so we fall back to empty parens rather than a misleading
+error in Magik, so we fall back to empty parens rather than a misleading
 snippet."
   (let ((cand (magik-completion-test--candidate nil '("new_name") '("new_properties") "(")))
     (magik-completion-test--with-settings t nil t
@@ -509,6 +510,166 @@ Skips the test when the Magik tree-sitter grammar is unavailable."
     (let ((vars (magik-completion--ts-scan-variables)))
       (should-not (member "compute_pair" vars))
       (should-not (seq-some (lambda (v) (string-prefix-p "_" v)) vars)))))
+
+;;; CB async query plumbing
+
+(defmacro magik-completion-test--with-fake-cb (proc-var &rest body)
+  "Bind PROC-VAR to a live `cat' process standing in for the CB.
+Its buffer is wired up the way `magik-completion--cb-filter' expects,
+and `magik-completion--ensure-cb-process' is stubbed to return it for
+the duration of BODY.  Anything written to the fake process is echoed
+back verbatim, which is what lets a test control fake CB responses by
+choosing what it sends."
+  (declare (indent 1))
+  `(let* ((cb-buf (generate-new-buffer " *test-cb*"))
+          (,proc-var (make-process :name "magik-completion-test-cb"
+                                    :buffer cb-buf
+                                    :command '("cat")
+                                    :connection-type 'pipe
+                                    :filter #'magik-completion--cb-filter)))
+     (unwind-protect
+         (cl-letf (((symbol-function 'magik-completion--ensure-cb-process)
+                    (lambda () ,proc-var)))
+           ,@body)
+       (when (process-live-p ,proc-var) (delete-process ,proc-var))
+       (when (buffer-live-p cb-buf) (kill-buffer cb-buf)))))
+
+(defun magik-completion-test--wait-until (predicate proc &optional timeout)
+  "Pump process/timer output until PREDICATE is non-nil or TIMEOUT
+\(default 2\) seconds pass.  Returns PREDICATE's final value."
+  (let ((deadline (+ (float-time) (or timeout 2))))
+    (while (and (not (funcall predicate))
+                (< (float-time) deadline))
+      (if (process-live-p proc)
+          (accept-process-output proc 0.05)
+        (sit-for 0.05)))
+    (funcall predicate)))
+
+(ert-deftest magik-completion--cb-query-async--returns-before-cb-replies ()
+  "Dispatching a query returns immediately; the result only reaches the
+callback once the (fake) CB actually replies."
+  (magik-completion-test--with-fake-cb proc
+    (let (result)
+      (should (magik-completion--cb-query-async
+               "PING\n" (lambda (r) (setq result r))
+               (lambda (str) (string-match-p "\n" str)) #'string-trim))
+      (should-not result)
+      (should (magik-completion-test--wait-until (lambda () result) proc))
+      (should (equal result "PING")))))
+
+(ert-deftest magik-completion--cb-query-async--queues-second-query-while-first-in-flight ()
+  "A second query issued before the first resolves is queued and
+serviced afterwards, rather than being sent concurrently (which would
+desync the single-command-at-a-time CB connection) or silently
+dropped."
+  (magik-completion-test--with-fake-cb proc
+    (let (result-a result-b)
+      (should (magik-completion--cb-query-async
+               "AAA\n" (lambda (r) (setq result-a r))
+               (lambda (str) (string-match-p "\n" str)) #'string-trim))
+      (should (magik-completion--cb-query-async
+               "BBB\n" (lambda (r) (setq result-b r))
+               (lambda (str) (string-match-p "\n" str)) #'string-trim))
+      (should (magik-completion-test--wait-until
+               (lambda () (and result-a result-b)) proc))
+      (should (equal result-a "AAA"))
+      (should (equal result-b "BBB")))))
+
+(ert-deftest magik-completion--cb-query-async--timeout-delivers-nil-and-restarts ()
+  "A CB that never replies delivers nil once `magik-completion-cb-timeout'
+elapses, instead of hanging forever, and its connection is torn down
+so stale output can't corrupt a later query."
+  (let ((magik-completion-cb-timeout 0.1))
+    (magik-completion-test--with-fake-cb proc
+      (let ((result 'never-called))
+        (should (magik-completion--cb-query-async
+                 "SILENCE" (lambda (r) (setq result r))
+                 (lambda (_str) nil) #'identity))
+        (should (magik-completion-test--wait-until
+                 (lambda () (not (eq result 'never-called))) proc))
+        (should-not result)
+        (should-not (process-live-p proc))))))
+
+(ert-deftest magik-completion--cb-cached-fetch--dispatches-once-then-caches ()
+  "The first call marks a fetch pending and dispatches it; a call made
+before that fetch resolves must not dispatch again; once the fetch's
+callback delivers a result, the cache is populated and later calls
+return it directly, still without re-dispatching."
+  (let ((cache-var (make-symbol "cache"))
+        (loaded-var (make-symbol "loaded"))
+        (pending-var (make-symbol "pending"))
+        (dispatch-count 0)
+        (delivered-callback nil))
+    (set cache-var nil)
+    (set loaded-var nil)
+    (set pending-var nil)
+    (cl-letf (((symbol-function 'magik-completion--cb-query-async)
+               (lambda (_command callback &rest _)
+                 (setq dispatch-count (1+ dispatch-count)
+                       delivered-callback callback)
+                 t)))
+      (should-not (magik-completion--cb-cached-fetch
+                   cache-var loaded-var pending-var "CMD\n"))
+      (should (symbol-value pending-var))
+      (should-not (symbol-value loaded-var))
+      (should-not (magik-completion--cb-cached-fetch
+                   cache-var loaded-var pending-var "CMD\n"))
+      (should (= dispatch-count 1))
+      (funcall delivered-callback '("a" "b"))
+      (should-not (symbol-value pending-var))
+      (should (symbol-value loaded-var))
+      (should (equal (symbol-value cache-var) '("a" "b")))
+      (should (equal (magik-completion--cb-cached-fetch
+                      cache-var loaded-var pending-var "CMD\n")
+                      '("a" "b")))
+      (should (= dispatch-count 1)))))
+
+;;; magik-completion--gis-session-idle-p
+
+(ert-deftest magik-completion--gis-session-idle-p--at-prompt-is-idle ()
+  "A session buffer ending at a fresh prompt is idle."
+  (with-temp-buffer
+    (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
+    (insert "some output\nMagik> ")
+    (should (magik-completion--gis-session-idle-p (current-buffer)))))
+
+(ert-deftest magik-completion--gis-session-idle-p--mid-output-is-busy ()
+  "A session buffer whose last line isn't a prompt is busy."
+  (with-temp-buffer
+    (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
+    (insert "Magik> some_long_running_command()\nstill working...\n")
+    (should-not (magik-completion--gis-session-idle-p (current-buffer)))))
+
+(ert-deftest magik-completion--gis-session-idle-p--no-prompt-seen-yet-is-busy ()
+  "A session buffer that has never shown a prompt (e.g. still starting
+up) is busy."
+  (with-temp-buffer
+    (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
+    (insert "opening database...\n")
+    (should-not (magik-completion--gis-session-idle-p (current-buffer)))))
+
+;;; Pending-flag reset when no CB is available
+
+(ert-deftest magik-completion--cb-cached-fetch--no-cb-available-clears-pending ()
+  "When `magik-completion--cb-query-async' can't dispatch at all (e.g.
+the session is busy, so `magik-completion--ensure-cb-process' refuses
+to start a connection), the pending flag must not get stuck: a later
+call has to be able to retry once the session is free again."
+  (let ((cache-var (make-symbol "cache"))
+        (loaded-var (make-symbol "loaded"))
+        (pending-var (make-symbol "pending")))
+    (set cache-var nil)
+    (set loaded-var nil)
+    (set pending-var nil)
+    (cl-letf (((symbol-function 'magik-completion--cb-query-async)
+               (lambda (&rest _) nil)))
+      (should-not (magik-completion--cb-cached-fetch
+                   cache-var loaded-var pending-var "CMD\n"))
+      (should-not (symbol-value pending-var))
+      ;; A later call (session free again) must be able to try once more.
+      (should-not (magik-completion--cb-cached-fetch
+                   cache-var loaded-var pending-var "CMD\n"))
+      (should-not (symbol-value pending-var)))))
 
 (provide 'magik-completion-test)
 ;;; magik-completion-test.el ends here

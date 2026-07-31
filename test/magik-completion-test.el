@@ -315,20 +315,20 @@ $
   "A prefix with no colon has no package qualifier."
   (should-not (magik-completion--typed-package "pseu")))
 
-(ert-deftest magik-completion-at-point-builtins--symbol-literal-offers-nothing ()
+(ert-deftest magik-completion-at-point-symbol--symbol-literal-offers-nothing ()
   "Typing a symbol literal like \":p\" offers no builtin completions."
   (with-temp-buffer
     (magik-mode)
     (insert ":p")
-    (let ((capf (magik-completion-at-point-builtins)))
+    (let ((capf (magik-completion-at-point-symbol)))
       (should-not (try-completion ":p" (nth 2 capf) nil)))))
 
-(ert-deftest magik-completion-at-point-builtins--package-qualified-prefix-matches ()
+(ert-deftest magik-completion-at-point-symbol--package-qualified-prefix-matches ()
   "Typing \"sw:rop\" still offers package-qualified builtin completions."
   (with-temp-buffer
     (magik-mode)
     (insert "sw:rop")
-    (let ((capf (magik-completion-at-point-builtins)))
+    (let ((capf (magik-completion-at-point-symbol)))
       (should (try-completion "sw:rop" (nth 2 capf) nil)))))
 
 ;;; Yasnippet template candidates
@@ -345,20 +345,23 @@ Skips the test when yasnippet is unavailable."
        (yas-minor-mode 1)
        ,@body)))
 
-(ert-deftest magik-completion-at-point-snippets--offers-keys ()
+(ert-deftest magik-completion-at-point-symbol--offers-snippet-keys ()
   "Snippet keys matching the prefix are offered as candidates."
   (magik-completion-test--with-snippet-buffer
     (insert "mk")
-    (let ((capf (magik-completion-at-point-snippets)))
+    (let ((capf (magik-completion-at-point-symbol)))
       (should capf)
-      (should (member "mkey" (nth 2 capf))))))
+      (should (try-completion "mkey" (nth 2 capf))))))
 
-(ert-deftest magik-completion-at-point-snippets--disabled-by-defcustom ()
+(ert-deftest magik-completion-at-point-symbol--snippets-disabled-by-defcustom ()
   "No snippet candidates when `magik-completion-enable-snippets' is nil."
   (magik-completion-test--with-snippet-buffer
     (insert "mk")
-    (let ((magik-completion-enable-snippets nil))
-      (should-not (magik-completion-at-point-snippets)))))
+    (let ((magik-completion-enable-snippets nil)
+          (magik-completion-enable-keywords nil)
+          (magik-completion-enable-variables nil)
+          (magik-completion-enable-cb nil))
+      (should-not (magik-completion-at-point-symbol)))))
 
 (ert-deftest magik-completion--snippet-exit-function--expands-template ()
   "Completing a snippet key replaces it with the expanded template."

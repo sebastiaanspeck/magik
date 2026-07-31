@@ -378,68 +378,12 @@ so code inspecting properties at position 0 (e.g. `magik-package',
     (add-text-properties 0 (length qualified) (text-properties-at 0 candidate) qualified)
     qualified))
 
-(defun magik-completion--package-agnostic-table (candidates)
-  "Return a completion table over CANDIDATES (bare names) that also
-offers/matches package-qualified forms like \"sw:rope\" when the typed
-text has a `package:' qualifier, by generating qualified candidate
-strings on the fly for that input (see
-`magik-completion--qualify-candidate'), so the candidate text itself
-already matches what's in the buffer and a plain accept just works."
-  (lambda (string pred action)
-    (complete-with-action
-     action
-     (if-let* ((package (magik-completion--typed-package string)))
-         (mapcar (lambda (c) (magik-completion--qualify-candidate package c))
-                 candidates)
-       candidates)
-     string pred)))
-
 (defun magik-completion--kind-annotation (kind)
   "Return an :annotation-function labeling candidates \"(magik-KIND)\"."
   (let ((text (format " (magik-%s)" kind)))
     (lambda (_) text)))
 
 ;;; --- CAPF functions ---
-
-(defun magik-completion-at-point-keywords ()
-  "Completion-at-point function for Magik keywords."
-  (when magik-completion-enable-keywords
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (end (cdr bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (string-prefix-p "_" prefix)
-          (list beg end magik-completion--keywords
-                :exclusive 'no
-                :company-kind (lambda (_) 'keyword)
-                :annotation-function (magik-completion--kind-annotation 'keyword)))))))
-
-(defun magik-completion-at-point-builtins ()
-  "Completion-at-point function for Magik built-in names."
-  (when magik-completion-enable-keywords
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (magik-completion--global-prefix-p beg prefix)
-          (list beg (cdr bounds)
-                (magik-completion--package-agnostic-table magik-completion--builtins)
-                :exclusive 'no
-                :company-kind (lambda (_) 'constant)
-                :annotation-function (magik-completion--kind-annotation 'constant)
-                :company-doc-buffer #'magik-completion--class-doc-buffer))))))
-
-(defun magik-completion-at-point-variables ()
-  "Completion-at-point function for local variables and parameters."
-  (when magik-completion-enable-variables
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (magik-completion--global-prefix-p beg prefix)
-          (when-let* ((vars (magik-completion--scan-local-variables)))
-            (list beg (cdr bounds) vars
-                  :exclusive 'no
-                  :company-kind (lambda (_) 'variable)
-                  :annotation-function (magik-completion--kind-annotation 'variable))))))))
 
 (defun magik-completion-at-point-slots ()
   "Completion-at-point function for exemplar slot references."
@@ -1112,22 +1056,6 @@ Completing a key expands the snippet template."
       (delete-region (- (point) (length candidate)) (point))
       (yas-expand-snippet template))))
 
-(defun magik-completion-at-point-snippets ()
-  "Completion-at-point function for yasnippet template keys."
-  (when magik-completion-enable-snippets
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (magik-completion--global-prefix-p beg prefix)
-          (when-let* ((templates (magik-completion--snippet-templates)))
-            (list beg (cdr bounds)
-                  (delq nil (mapcar #'yas--template-key templates))
-                  :exclusive 'no
-                  :company-kind (lambda (_) 'snippet)
-                  :annotation-function (magik-completion--kind-annotation 'snippet)
-                  :exit-function #'magik-completion--snippet-exit-function
-                  )))))))
-
 ;;; --- Yasnippet post-completion ---
 
 (declare-function yas-expand-snippet "yasnippet")
@@ -1233,49 +1161,106 @@ Inserts parameters as yasnippet when STATUS is `finished'."
                   :company-doc-buffer #'magik-completion--doc-buffer
                   :exit-function #'magik-completion--exit-function)))))))
 
-(defun magik-completion-at-point-classes ()
-  "Completion-at-point function for class/exemplar names via CB."
-  (when magik-completion-enable-cb
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (magik-completion--global-prefix-p beg prefix)
-          (when-let* ((classes (magik-completion--query-classes)))
-            (list beg (cdr bounds)
-                  (magik-completion--package-agnostic-table classes)
-                  :exclusive 'no
-                  :company-kind (lambda (_) 'class)
-                  :annotation-function (magik-completion--kind-annotation 'class)
-                  :company-doc-buffer #'magik-completion--class-doc-buffer)))))))
+(defun magik-completion--tag-kind (candidates kind)
+  "Return CANDIDATES with a `magik-kind' text property set to KIND.
+Existing text properties on each candidate (e.g. `magik-package') are
+preserved."
+  (mapcar (lambda (c) (propertize c 'magik-kind kind)) candidates))
 
-(defun magik-completion-at-point-globals ()
-  "Completion-at-point function for globals/dynamics via CB."
-  (when magik-completion-enable-cb
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (string-prefix-p "!" prefix)
-          (when-let* ((globals (magik-completion--query-globals)))
-            (list (car bounds) (cdr bounds) globals
-                  :exclusive 'no
-                  :company-kind (lambda (_) 'variable)
-                  :annotation-function (magik-completion--kind-annotation 'variable)
-                  :company-doc-buffer #'magik-completion--doc-buffer)))))))
+(defun magik-completion--tag-global (candidate)
+  "Tag global CANDIDATE with its `magik-kind'.
+Bang-delimited names (e.g. \"!terminal!\") are Magik's convention for
+dynamic variables, so they're tagged `variable'; everything else is a
+global procedure, tagged `method'."
+  (propertize candidate 'magik-kind
+              (if (and (string-prefix-p "!" candidate)
+                       (string-suffix-p "!" candidate)
+                       (> (length candidate) 1))
+                  'variable
+                'method)))
 
-(defun magik-completion-at-point-global-procedures ()
-  "Completion-at-point function for global procedures via CB."
-  (when magik-completion-enable-cb
-    (when-let* ((bounds (magik-completion--bounds)))
-      (let ((beg (car bounds))
-            (prefix (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (when (magik-completion--global-prefix-p beg prefix)
-          (when-let* ((global-procedures (magik-completion--query-globals)))
-            (list beg (cdr bounds)
-                  (magik-completion--package-agnostic-table global-procedures)
+(defun magik-completion--symbol-table (qualifiable plain)
+  "Return a completion table over the union of QUALIFIABLE and PLAIN.
+QUALIFIABLE candidates (built-ins, classes, globals) also match
+package-qualified forms like \"sw:rope\" when the typed text has a
+`package:' qualifier, by generating qualified candidate strings on the
+fly (see `magik-completion--qualify-candidate'). PLAIN candidates
+(local variables, snippet keys) are never package-qualified."
+  (lambda (string pred action)
+    (complete-with-action
+     action
+     (append
+      (if-let* ((package (magik-completion--typed-package string)))
+          (mapcar (lambda (c) (magik-completion--qualify-candidate package c))
+                  qualifiable)
+        qualifiable)
+      plain)
+     string pred)))
+
+(defun magik-completion--symbol-kind (candidate)
+  "Return CANDIDATE's `magik-kind' text property, for :company-kind."
+  (get-text-property 0 'magik-kind candidate))
+
+(defun magik-completion--symbol-annotation (candidate)
+  "Return an annotation for CANDIDATE based on its `magik-kind'."
+  (funcall (magik-completion--kind-annotation
+            (magik-completion--symbol-kind candidate))
+           candidate))
+
+(defun magik-completion--symbol-doc-buffer (candidate)
+  "Return a documentation buffer for CANDIDATE based on its `magik-kind'."
+  (pcase (magik-completion--symbol-kind candidate)
+    ((or 'constant 'class) (magik-completion--class-doc-buffer candidate))
+    ((or 'method 'variable) (magik-completion--doc-buffer candidate))))
+
+(defun magik-completion--symbol-exit-function (candidate status)
+  "Exit function for CANDIDATE based on its `magik-kind'."
+  (pcase (magik-completion--symbol-kind candidate)
+    ('method (magik-completion--exit-function candidate status))
+    ('snippet (magik-completion--snippet-exit-function candidate status))))
+
+(defun magik-completion-at-point-symbol ()
+  "Completion-at-point function for identifiers: keywords, built-ins,
+local variables, classes, global procedures/dynamics, and yasnippet
+template keys."
+  (when-let* ((bounds (magik-completion--bounds)))
+    (let* ((beg (car bounds))
+           (end (cdr bounds))
+           (prefix (buffer-substring-no-properties beg end)))
+      (cond
+       ((string-prefix-p "_" prefix)
+        (when magik-completion-enable-keywords
+          (list beg end magik-completion--keywords
+                :exclusive 'no
+                :company-kind (lambda (_) 'keyword)
+                :annotation-function (magik-completion--kind-annotation 'keyword))))
+       ((magik-completion--global-prefix-p beg prefix)
+        (let ((qualifiable
+               (append
+                (when magik-completion-enable-keywords
+                  (magik-completion--tag-kind magik-completion--builtins 'constant))
+                (when magik-completion-enable-cb
+                  (magik-completion--tag-kind (magik-completion--query-classes) 'class))
+                (when magik-completion-enable-cb
+                  (mapcar #'magik-completion--tag-global
+                          (magik-completion--query-globals)))))
+              (plain
+               (append
+                (when magik-completion-enable-variables
+                  (magik-completion--tag-kind
+                   (magik-completion--scan-local-variables) 'variable))
+                (when magik-completion-enable-snippets
+                  (magik-completion--tag-kind
+                   (delq nil (mapcar #'yas--template-key
+                                      (magik-completion--snippet-templates)))
+                   'snippet)))))
+          (when (or qualifiable plain)
+            (list beg end (magik-completion--symbol-table qualifiable plain)
                   :exclusive 'no
-                  :exit-function #'magik-completion--exit-function
-                  :company-kind (lambda (_) 'method)
-                  :annotation-function (magik-completion--kind-annotation 'method)
-                  :company-doc-buffer #'magik-completion--doc-buffer)))))))
+                  :company-kind #'magik-completion--symbol-kind
+                  :annotation-function #'magik-completion--symbol-annotation
+                  :company-doc-buffer #'magik-completion--symbol-doc-buffer
+                  :exit-function #'magik-completion--symbol-exit-function))))))))
 
 ;;; --- Condition completion ---
 
@@ -1372,18 +1357,13 @@ does not serve candidates from a previous session."
 
 (defvar magik-completion--capf-functions
   '(magik-completion-at-point-conditions
-    magik-completion-at-point-global-procedures
-    magik-completion-at-point-globals
-    magik-completion-at-point-classes
     magik-completion-at-point-methods
-    magik-completion-at-point-snippets
     magik-completion-at-point-slots
-    magik-completion-at-point-variables
-    magik-completion-at-point-builtins
-    magik-completion-at-point-keywords)
+    magik-completion-at-point-symbol)
   "List of Magik CAPF functions, lowest priority first.
-Buffer-local sources are listed last so `magik-completion--enable'
-(which prepends each entry) tries them before the CB-backed ones.")
+`magik-completion-at-point-symbol' is listed last so
+`magik-completion--enable' (which prepends each entry) tries it before
+the narrower dot- and condition-context backends.")
 
 (defconst magik-completion--transmit-functions
   '(magik-product-transmit-buffer

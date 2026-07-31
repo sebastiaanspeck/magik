@@ -697,11 +697,22 @@ then dispatch the next queued query on this connection, if any."
   (when-let* ((next (pop magik-completion--cb-queue)))
     (apply #'magik-completion--cb-dispatch (current-buffer) next)))
 
-(defun magik-completion--cb-query-async (command callback &optional ready-p parse-fn)
+(declare-function corfu--post-command "corfu")
+
+(defun magik-completion--nudge-doc-display ()
+  "Redisplay doc for the current candidate without restarting completion.
+No-op unless Corfu popupinfo is the active frontend."
+  (when (and completion-in-region-mode
+             (bound-and-true-p corfu-popupinfo-mode)
+             (fboundp 'corfu--post-command))
+    (ignore-errors (corfu--post-command))))
+
+(defun magik-completion--cb-query-async (command callback &optional ready-p parse-fn no-refresh)
   "Send COMMAND to the CB without blocking; return t if dispatched or
-queued, nil if no CB is available.  CALLBACK gets the result later,
-with completion recomputed if still in progress.  READY-P/PARSE-FN
-override the default dispatch, see `magik-completion--cb-filter'."
+queued, nil if no CB is available.  CALLBACK gets the result later.
+Unless NO-REFRESH (for doc-only fetches), completion is recomputed to
+show it; READY-P/PARSE-FN override the default dispatch, see
+`magik-completion--cb-filter'."
   (when-let* ((proc (magik-completion--ensure-cb-process))
               (buf (process-buffer proc))
               (_ (buffer-live-p buf)))
@@ -714,9 +725,11 @@ override the default dispatch, see `magik-completion--cb-filter'."
                  (when (buffer-live-p requester)
                    (with-current-buffer requester
                      (funcall callback result)
-                     (when (and completion-in-region-mode
-                                (fboundp 'completion-at-point))
-                       (ignore-errors (completion-at-point))))))))))
+                     (if no-refresh
+                         (magik-completion--nudge-doc-display)
+                       (when (and completion-in-region-mode
+                                  (fboundp 'completion-at-point))
+                         (ignore-errors (completion-at-point)))))))))))
       (if (eq (buffer-local-value 'magik-completion--cb-candidates buf) 'pending)
           (with-current-buffer buf
             (setq magik-completion--cb-queue
@@ -914,7 +927,8 @@ Kicks off a background fetch and returns nil when not yet cached."
                  (setq magik-completion--class-comment-fetch-pending nil)
                  (puthash class (or result 'none) magik-completion--class-comment-cache))
                #'magik-completion--class-comment-ready-p
-               #'magik-completion--parse-class-comment)
+               #'magik-completion--parse-class-comment
+               t)
         ;; No CB available right now: nothing will clear the flag.
         (setq magik-completion--class-comment-fetch-pending nil))
       nil))))

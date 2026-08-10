@@ -62,6 +62,11 @@ Set to nil before mode activation to disable, or use
   :type 'boolean
   :group 'magik-completion)
 
+(defcustom magik-completion-enable-characters t
+  "When non-nil, offer Magik character-literal names after `%'."
+  :type 'boolean
+  :group 'magik-completion)
+
 (defcustom magik-completion-insert-params t
   "When non-nil, insert method parameters as a yasnippet after completion."
   :type 'boolean
@@ -104,6 +109,35 @@ Set to nil before mode activation to disable, or use
   "List of commonly used Magik built-in names for completion.
 All of these live in the `sw' package, so each name is tagged with
 that via a `magik-package' text property, for doc-buffer lookups.")
+
+(defconst magik-completion--character-names
+  '("nul" "soh" "stx" "etx" "eot" "enq" "ack" "bell" "bel" "alert"
+    "backspace" "bs" "tab" "ht" "newline" "lf" "linefeed" "vt"
+    "verticaltab" "formfeed" "ff" "return" "cr" "so" "si" "dle" "dc1"
+    "dc2" "dc3" "dc4" "nak" "syn" "etb" "can" "em" "sub" "escape" "esc"
+    "fs" "gs" "rs" "us" "space" "blank" "delete" "del" "rubout" "csi"
+    "nobreakspace" "exclamdown" "cent" "sterling" "currency" "yen"
+    "brokenbar" "section" "diaeresis" "copyright" "ordfeminine"
+    "guillemotleft" "notsign" "softhyphen" "registered" "macron"
+    "degree" "plusminus" "superscripttwo" "superscriptthree" "acute"
+    "mu" "paragraph" "centeredperiod" "cedilla" "superscriptone"
+    "masculine" "guillemotright" "onequarter" "onehalf" "threequarters"
+    "questiondown" "Agrave" "Aacute" "Acircumflex" "Atilde"
+    "Adiaeresis" "Aring" "AE" "Ccedilla" "Egrave" "Eacute"
+    "Ecircumflex" "Ediaeresis" "Igrave" "Iacute" "Icircumflex"
+    "Idiaeresis" "Eth" "Ntilde" "Ograve" "Oacute" "Ocircumflex"
+    "Otilde" "Odiaeresis" "multiply" "Ooblique" "Ugrave" "Uacute"
+    "Ucircumflex" "Udiaeresis" "Yacute" "Thorn" "ssharp"
+    "germandoubles" "agrave" "aacute" "acircumflex" "atilde"
+    "adiaeresis" "aring" "ae" "ccedilla" "egrave" "eacute"
+    "ecircumflex" "ediaeresis" "igrave" "iacute" "icircumflex"
+    "idiaeresis" "eth" "ntilde" "ograve" "oacute" "ocircumflex"
+    "otilde" "odiaeresis" "division" "oslash" "ugrave" "uacute"
+    "ucircumflex" "udiaeresis" "yacute" "thorn" "ydiaeresis" "ind"
+    "nel" "ssa" "esa" "hts" "htj" "vts" "pld" "plu" "ri" "ss2" "ss3"
+    "dcs" "pu1" "pu2" "sts" "cch" "mw" "spa" "epa" "st" "osc" "pm"
+    "apc" "nbs")
+  "List of Magik `%name' character-literal names for completion.")
 
 ;;; --- Variable scanning ---
 
@@ -354,6 +388,26 @@ Returns nil if point is inside a comment or string."
                          (memq pre-dot '(?\s ?\t ?\n ?\( ?, ?\;)))))
           (cons beg end))))))
 
+(defun magik-completion--after-char-p (pos char)
+  "Return non-nil if POS is immediately preceded by CHAR."
+  (and (> pos (point-min))
+       (eq (char-before pos) char)))
+
+(defun magik-completion--character-bounds ()
+  "Return bounds if point is completing a `%name' character literal.
+Unlike sibling bounds functions, this allows an empty prefix (BEG == END)
+so the full candidate list appears immediately after a bare `%'."
+  (let ((syntax (syntax-ppss)))
+    (when (and (magik-completion--available-p)
+               (not (nth 3 syntax))
+               (not (nth 4 syntax)))
+      (let* ((end (point))
+             (beg (save-excursion
+                    (skip-chars-backward "a-zA-Z0-9")
+                    (point))))
+        (when (magik-completion--after-char-p beg ?%)
+          (cons beg end))))))
+
 (defun magik-completion--global-prefix-p (beg prefix)
   "Return non-nil if PREFIX starting at BEG is eligible for global completion.
 This excludes `_' keywords and slot/method access after a `.'."
@@ -393,6 +447,15 @@ so code inspecting properties at position 0 (e.g. `magik-package',
           :exclusive 'no
           :company-kind (lambda (_) 'slot)
           :annotation-function (magik-completion--kind-annotation 'slot))))
+
+(defun magik-completion-at-point-character ()
+  "Completion-at-point function for `%name' character literals."
+  (when magik-completion-enable-characters
+    (when-let* ((bounds (magik-completion--character-bounds)))
+      (list (car bounds) (cdr bounds) magik-completion--character-names
+            :exclusive 'no
+            :company-kind (lambda (_) 'character)
+            :annotation-function (magik-completion--kind-annotation 'character)))))
 
 ;;; --- Class Browser integration ---
 
@@ -1223,44 +1286,49 @@ fly (see `magik-completion--qualify-candidate'). PLAIN candidates
   "Completion-at-point function for identifiers: keywords, built-ins,
 local variables, classes, global procedures/dynamics, and yasnippet
 template keys."
-  (when-let* ((bounds (magik-completion--bounds)))
-    (let* ((beg (car bounds))
-           (end (cdr bounds))
-           (prefix (buffer-substring-no-properties beg end)))
-      (cond
-       ((string-prefix-p "_" prefix)
-        (when magik-completion-enable-keywords
-          (list beg end magik-completion--keywords
+  (when-let* ((bounds (magik-completion--bounds))
+              (beg (car bounds))
+              (end (cdr bounds))
+              ;; a `%name' character literal is handled exclusively by
+              ;; `magik-completion-at-point-character', not here; `@' is
+              ;; excluded outright
+              ((not (or (magik-completion--after-char-p beg ?%)
+                        (magik-completion--after-char-p beg ?@))))
+              (prefix (buffer-substring-no-properties beg end)))
+    (cond
+     ((string-prefix-p "_" prefix)
+      (when magik-completion-enable-keywords
+        (list beg end magik-completion--keywords
+              :exclusive 'no
+              :company-kind (lambda (_) 'keyword)
+              :annotation-function (magik-completion--kind-annotation 'keyword))))
+     ((magik-completion--global-prefix-p beg prefix)
+      (let ((qualifiable
+             (append
+              (when magik-completion-enable-keywords
+                (magik-completion--tag-kind magik-completion--builtins 'constant))
+              (when magik-completion-enable-cb
+                (magik-completion--tag-kind (magik-completion--query-classes) 'class))
+              (when magik-completion-enable-cb
+                (mapcar #'magik-completion--tag-global
+                        (magik-completion--query-globals)))))
+            (plain
+             (append
+              (when magik-completion-enable-variables
+                (magik-completion--tag-kind
+                 (magik-completion--scan-local-variables) 'variable))
+              (when magik-completion-enable-snippets
+                (magik-completion--tag-kind
+                 (delq nil (mapcar #'yas--template-key
+                                    (magik-completion--snippet-templates)))
+                 'snippet)))))
+        (when (or qualifiable plain)
+          (list beg end (magik-completion--symbol-table qualifiable plain)
                 :exclusive 'no
-                :company-kind (lambda (_) 'keyword)
-                :annotation-function (magik-completion--kind-annotation 'keyword))))
-       ((magik-completion--global-prefix-p beg prefix)
-        (let ((qualifiable
-               (append
-                (when magik-completion-enable-keywords
-                  (magik-completion--tag-kind magik-completion--builtins 'constant))
-                (when magik-completion-enable-cb
-                  (magik-completion--tag-kind (magik-completion--query-classes) 'class))
-                (when magik-completion-enable-cb
-                  (mapcar #'magik-completion--tag-global
-                          (magik-completion--query-globals)))))
-              (plain
-               (append
-                (when magik-completion-enable-variables
-                  (magik-completion--tag-kind
-                   (magik-completion--scan-local-variables) 'variable))
-                (when magik-completion-enable-snippets
-                  (magik-completion--tag-kind
-                   (delq nil (mapcar #'yas--template-key
-                                      (magik-completion--snippet-templates)))
-                   'snippet)))))
-          (when (or qualifiable plain)
-            (list beg end (magik-completion--symbol-table qualifiable plain)
-                  :exclusive 'no
-                  :company-kind #'magik-completion--symbol-kind
-                  :annotation-function #'magik-completion--symbol-annotation
-                  :company-doc-buffer #'magik-completion--symbol-doc-buffer
-                  :exit-function #'magik-completion--symbol-exit-function))))))))
+                :company-kind #'magik-completion--symbol-kind
+                :annotation-function #'magik-completion--symbol-annotation
+                :company-doc-buffer #'magik-completion--symbol-doc-buffer
+                :exit-function #'magik-completion--symbol-exit-function)))))))
 
 ;;; --- Condition completion ---
 
@@ -1359,6 +1427,7 @@ does not serve candidates from a previous session."
   '(magik-completion-at-point-conditions
     magik-completion-at-point-methods
     magik-completion-at-point-slots
+    magik-completion-at-point-character
     magik-completion-at-point-symbol)
   "List of Magik CAPF functions, lowest priority first.
 `magik-completion-at-point-symbol' is listed last so

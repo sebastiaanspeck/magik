@@ -331,6 +331,112 @@ $
     (let ((capf (magik-completion-at-point-symbol)))
       (should (try-completion "sw:rop" (nth 2 capf) nil)))))
 
+;;; Character-literal completion
+
+(ert-deftest magik-completion-at-point-character--bare-percent-offers-full-list ()
+  "A bare `%' offers the full character-name list immediately."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%")
+    (let ((capf (magik-completion-at-point-character)))
+      (should capf)
+      (should (equal (list (nth 0 capf) (nth 1 capf)) (list (point) (point))))
+      (should (member "nul" (nth 2 capf)))
+      (should (member "newline" (nth 2 capf)))
+      (should (member "nbs" (nth 2 capf))))))
+
+(ert-deftest magik-completion-at-point-character--narrows-to-matching-name ()
+  "Typing \"%new\" narrows to \"newline\"."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%new")
+    (let ((capf (magik-completion-at-point-character)))
+      (should (equal (try-completion "new" (nth 2 capf)) "newline")))))
+
+(ert-deftest magik-completion-at-point-character--not-after-percent-offers-nothing ()
+  "A plain identifier with no preceding `%' offers no character candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "new")
+    (should-not (magik-completion-at-point-character))))
+
+(ert-deftest magik-completion-at-point-character--disabled-by-defcustom ()
+  "No character candidates when `magik-completion-enable-characters' is nil."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%new")
+    (let ((magik-completion-enable-characters nil))
+      (should-not (magik-completion-at-point-character)))))
+
+(ert-deftest magik-completion-at-point-character--string-offers-nothing ()
+  "A `%name' inside a string literal offers no character candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "\"text %new")
+    (should-not (magik-completion-at-point-character))))
+
+(ert-deftest magik-completion-at-point-character--comment-offers-nothing ()
+  "A `%name' inside a comment offers no character candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "# %new")
+    (should-not (magik-completion-at-point-character))))
+
+(ert-deftest magik-completion-at-point-symbol--percent-context-offers-nothing ()
+  "Typing after `%' offers no keyword/builtin/variable/snippet candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%new")
+    (should-not (magik-completion-at-point-symbol))))
+
+(ert-deftest magik-completion-at-point-symbol--percent-underscore-offers-nothing ()
+  "Typing \"%_self\" offers no keyword candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%_self")
+    (should-not (magik-completion-at-point-symbol))))
+
+(ert-deftest magik-completion--character-bounds--percent-at-buffer-start ()
+  "A `%' as the very first character of the buffer still yields bounds."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%")
+    (should (equal (magik-completion--character-bounds) (cons (point) (point))))))
+
+(ert-deftest magik-completion--character-bounds--not-after-percent-returns-nil ()
+  "No bounds are returned without a preceding `%'."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "new")
+    (should-not (magik-completion--character-bounds))))
+
+(ert-deftest magik-completion-at-point-symbol--backspace-after-percent-falls-back ()
+  "Removing the `%' cleanly falls back to ordinary symbol completion."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "%new")
+    (should-not (magik-completion-at-point-symbol))
+    (delete-char -4)
+    (insert "new")
+    (should (magik-completion-at-point-symbol))))
+
+(ert-deftest magik-completion-at-point-symbol--at-context-offers-nothing ()
+  "Typing after `@' offers no keyword/builtin/variable/snippet candidates."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "@new")
+    (should-not (magik-completion-at-point-symbol))))
+
+(ert-deftest magik-completion-at-point-symbol--backspace-after-at-falls-back ()
+  "Removing the `@' cleanly falls back to ordinary symbol completion."
+  (with-temp-buffer
+    (magik-mode)
+    (insert "@new")
+    (should-not (magik-completion-at-point-symbol))
+    (delete-char -4)
+    (insert "new")
+    (should (magik-completion-at-point-symbol))))
+
 ;;; Yasnippet template candidates
 
 (defmacro magik-completion-test--with-snippet-buffer (&rest body)

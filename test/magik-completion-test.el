@@ -780,5 +780,48 @@ call has to be able to retry once the session is free again."
                    cache-var loaded-var pending-var "CMD\n"))
       (should-not (symbol-value pending-var)))))
 
+;;; Session-restart cleanup
+
+(ert-deftest magik-completion--reset-session-state--clears-buffer-local-cb-state ()
+  "Resetting session state clears a buffer's dedicated CB connection,
+so a stale process handle can't be reused after a restart."
+  (magik-completion-test--with-fake-cb proc
+    (with-temp-buffer
+      (magik-completion-mode 1)
+      (setq magik-completion--cb-process proc
+            magik-completion--cb-buffer-name (buffer-name (process-buffer proc))
+            magik-completion--cb-candidates '("stale")
+            magik-completion--cb-filter-str "partial"
+            magik-completion--cb-ready-p #'ignore
+            magik-completion--cb-parse-fn #'identity
+            magik-completion--cb-on-response #'ignore
+            magik-completion--cb-queue '(("CMD\n" nil nil ignore)))
+      (magik-completion--reset-session-state)
+      (should-not magik-completion--cb-process)
+      (should-not magik-completion--cb-buffer-name)
+      (should-not magik-completion--cb-candidates)
+      (should (equal magik-completion--cb-filter-str ""))
+      (should-not magik-completion--cb-ready-p)
+      (should-not magik-completion--cb-parse-fn)
+      (should-not magik-completion--cb-on-response)
+      (should-not magik-completion--cb-queue))))
+
+(ert-deftest magik-completion--reset-session-state--ignores-buffers-without-completion-mode ()
+  "Buffers without `magik-completion-mode' enabled are left untouched."
+  (magik-completion-test--with-fake-cb proc
+    (with-temp-buffer
+      (setq magik-completion--cb-process proc)
+      (magik-completion--reset-session-state)
+      (should (eq magik-completion--cb-process proc)))))
+
+(ert-deftest magik-completion--reset-session-state--still-kills-named-cb-buffers ()
+  "The pre-existing kill-by-name-pattern behavior for dedicated CB
+subprocess buffers still holds alongside the new per-buffer reset."
+  (magik-completion-test--with-fake-cb proc
+    (with-current-buffer (process-buffer proc)
+      (rename-buffer " *cb*fake.magik*completion*"))
+    (magik-completion--reset-session-state)
+    (should-not (get-buffer " *cb*fake.magik*completion*"))))
+
 (provide 'magik-completion-test)
 ;;; magik-completion-test.el ends here

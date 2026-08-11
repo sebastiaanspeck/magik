@@ -1408,11 +1408,24 @@ Intended to be called after transmitting code to the session."
   (clrhash magik-completion--class-comment-cache))
 
 (defun magik-completion--reset-session-state (&rest _args)
-  "Invalidate caches and kill all dedicated completion CB buffers.
+  "Invalidate caches, kill all dedicated completion CB buffers, and
+clear the dedicated-CB-connection state of every buffer with
+`magik-completion-mode' enabled.
 Called when a Magik session is killed or (re)started, so completion
-does not serve candidates from a previous session."
+does not serve candidates -- or hang onto a dead connection -- from a
+previous session."
   (magik-completion-invalidate-cache)
   (dolist (buf (buffer-list))
+    (when (buffer-local-value 'magik-completion-mode buf)
+      (with-current-buffer buf
+        (setq magik-completion--cb-process nil
+              magik-completion--cb-buffer-name nil
+              magik-completion--cb-candidates nil
+              magik-completion--cb-filter-str ""
+              magik-completion--cb-ready-p nil
+              magik-completion--cb-parse-fn nil
+              magik-completion--cb-on-response nil
+              magik-completion--cb-queue nil)))
     (let ((name (buffer-name buf)))
       (when (and name
                  (string-prefix-p " *cb*" name)

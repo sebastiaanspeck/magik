@@ -565,18 +565,24 @@ answer its first query while `method_finder' loads its database."
 (defun magik-completion--gis-session-idle-p (gis-buf)
   "Return non-nil if the session in GIS-BUF is idle at its prompt.
 Starting a CB connection blocks until the session answers, so check
-this first and skip the attempt while busy (e.g. mid-startup)."
+this first and skip the attempt while busy (e.g. mid-startup).  Checks
+up to the process mark rather than `point-max', so a command the user
+has typed but not yet submitted -- as when GIS-BUF is the very buffer
+completion was requested from -- isn't mistaken for the session being
+busy."
   (with-current-buffer gis-buf
-    (and (boundp 'magik-session-prompt)
-         magik-session-prompt
-         (save-excursion
-           (goto-char (point-max))
-           (and (re-search-backward magik-session-prompt nil t)
-                (save-match-data
-                  (save-excursion
-                    (goto-char (match-end 0))
-                    (skip-chars-forward " \t\n")
-                    (eobp))))))))
+    (when-let* ((proc (get-buffer-process gis-buf))
+                (mark-pos (marker-position (process-mark proc))))
+      (and (boundp 'magik-session-prompt)
+           magik-session-prompt
+           (save-excursion
+             (goto-char mark-pos)
+             (and (re-search-backward magik-session-prompt nil t)
+                  (save-match-data
+                    (save-excursion
+                      (goto-char (match-end 0))
+                      (skip-chars-forward " \t\n")
+                      (>= (point) mark-pos)))))))))
 
 (defun magik-completion--ensure-cb-process ()
   "Ensure a dedicated CB process is running; return it, or nil if it

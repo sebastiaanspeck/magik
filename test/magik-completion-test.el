@@ -735,19 +735,36 @@ return it directly, still without re-dispatching."
 
 ;;; magik-completion--gis-session-idle-p
 
+(defmacro magik-completion-test--with-session-process (mark-pos &rest body)
+  "Eval BODY with a live process attached to the current buffer,
+its `process-mark' set to MARK-POS."
+  (declare (indent 1))
+  `(let ((proc (make-process :name "magik-completion-test-session"
+                              :buffer (current-buffer)
+                              :command '("cat")
+                              :connection-type 'pipe
+                              :noquery t)))
+     (unwind-protect
+         (progn
+           (set-marker (process-mark proc) ,mark-pos)
+           ,@body)
+       (when (process-live-p proc) (delete-process proc)))))
+
 (ert-deftest magik-completion--gis-session-idle-p--at-prompt-is-idle ()
   "A session buffer ending at a fresh prompt is idle."
   (with-temp-buffer
     (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
     (insert "some output\nMagik> ")
-    (should (magik-completion--gis-session-idle-p (current-buffer)))))
+    (magik-completion-test--with-session-process (point-max)
+      (should (magik-completion--gis-session-idle-p (current-buffer))))))
 
 (ert-deftest magik-completion--gis-session-idle-p--mid-output-is-busy ()
   "A session buffer whose last line isn't a prompt is busy."
   (with-temp-buffer
     (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
     (insert "Magik> some_long_running_command()\nstill working...\n")
-    (should-not (magik-completion--gis-session-idle-p (current-buffer)))))
+    (magik-completion-test--with-session-process (point-max)
+      (should-not (magik-completion--gis-session-idle-p (current-buffer))))))
 
 (ert-deftest magik-completion--gis-session-idle-p--no-prompt-seen-yet-is-busy ()
   "A session buffer that has never shown a prompt (e.g. still starting
@@ -755,7 +772,20 @@ up) is busy."
   (with-temp-buffer
     (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
     (insert "opening database...\n")
-    (should-not (magik-completion--gis-session-idle-p (current-buffer)))))
+    (magik-completion-test--with-session-process (point-max)
+      (should-not (magik-completion--gis-session-idle-p (current-buffer))))))
+
+(ert-deftest magik-completion--gis-session-idle-p--unsent-input-after-prompt-is-still-idle ()
+  "Regression test: text the user has typed but not yet submitted,
+sitting after the process mark, must not be mistaken for the session
+being busy -- this is exactly the case when completion is requested
+from within the session buffer itself."
+  (with-temp-buffer
+    (setq-local magik-session-prompt (regexp-opt '("Magik> ")))
+    (insert "some output\nMagik> ")
+    (magik-completion-test--with-session-process (point-max)
+      (insert "pseudo_area.new_fo")
+      (should (magik-completion--gis-session-idle-p (current-buffer))))))
 
 ;;; Pending-flag reset when no CB is available
 

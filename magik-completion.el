@@ -215,12 +215,10 @@ Returns a list of variable name strings."
 Returns a list of variable name strings visible at point."
   (let ((variables '())
         (node (treesit-node-at (point))))
-    ;; Parameters come from the enclosing method or procedure, even
-    ;; when point is inside a nested block.
+    ;; Params come from the enclosing method/procedure even in a nested block.
     (when-let* ((scope (magik-completion--ts-enclosing-scope
                         node magik-completion--ts-param-scopes)))
       (setq variables (magik-completion--ts-collect-params scope variables)))
-    ;; Collect local variables and assignments within scope, before point.
     (when-let* ((scope (magik-completion--ts-enclosing-scope
                         node magik-completion--ts-local-scopes)))
       (setq variables (magik-completion--ts-walk-for-assignments
@@ -288,7 +286,6 @@ Returns the updated VARIABLES list."
         (setq variables (magik-completion--ts-add-names
                          (magik-completion--ts-filter-children node "identifier")
                          limit variables)))))
-    ;; Recurse into children
     (dolist (child (treesit-node-children node))
       (when (< (treesit-node-start child) limit)
         (setq variables (magik-completion--ts-walk-for-assignments child limit variables)))))
@@ -305,14 +302,12 @@ Returns a list of variable name strings."
                             (point-min))))
         (case-fold-search nil))
     (save-excursion
-      ;; Find _local declarations
       (goto-char method-start)
       (while (re-search-forward
               "\\_<_local\\s-+\\([a-z_][a-z0-9_!?]*\\)" limit t)
         (let ((var (match-string-no-properties 1)))
           (unless (member var variables)
             (push var variables))))
-      ;; Find << assignments (often introduces variables)
       (goto-char method-start)
       (while (re-search-forward
               "\\b\\([a-z_][a-z0-9_!?]*\\)\\s-*<<" limit t)
@@ -320,7 +315,6 @@ Returns a list of variable name strings."
           (unless (or (member var variables)
                       (string-prefix-p "_" var))
             (push var variables))))
-      ;; Find _for loop variables
       (goto-char method-start)
       (while (re-search-forward
               "\\_<_for\\s-+\\([a-z_][a-z0-9_!?, ]*\\)\\s-+_over" limit t)
@@ -328,7 +322,6 @@ Returns a list of variable name strings."
           (dolist (v (split-string vars-str "[, \t]+" t))
             (unless (member v variables)
               (push v variables)))))
-      ;; Find _import declarations
       (goto-char method-start)
       (while (re-search-forward
               "\\_<_import\\s-+\\([a-z_][a-z0-9_!?, \t]*\\)" limit t)
@@ -336,7 +329,6 @@ Returns a list of variable name strings."
           (unless (or (string-prefix-p "_" v)
                       (member v variables))
             (push v variables)))))
-    ;; Find method parameters
     (save-excursion
       (goto-char method-start)
       (when (re-search-forward
@@ -486,7 +478,7 @@ so code inspecting properties at position 0 (e.g. `magik-package',
     qualified))
 
 (defun magik-completion--kind-annotation (kind)
-  "Return an :annotation-function labeling candidates \"(magik-KIND)\"."
+  "Return an :annotation-function labeling candidates \"(magik- KIND)\"."
   (let ((text (format " (magik-%s)" kind)))
     (lambda (_) text)))
 
@@ -525,20 +517,21 @@ so code inspecting properties at position 0 (e.g. `magik-package',
   "Accumulator for CB process filter output.")
 
 (defvar-local magik-completion--cb-ready-p nil
-  "When non-nil, a predicate checking whether the current query's
-response (`magik-completion--cb-filter-str') is complete.  Used for
-queries whose responses aren't signalled by a control character.")
+  "When non-nil, a predicate checking whether cb is ready.
+Checks whetherthe current query's response
+\(`magik-completion--cb-filter-str'\) is complete.
+Used for queries whose responses aren't signalled by a control character.")
 
 (defvar-local magik-completion--cb-parse-fn nil
-  "When non-nil, the parser to use for the current query's response,
+  "When non-nil, the parser to use for the current query's response.
 overriding the default control-character dispatch.")
 
 (defvar-local magik-completion--cb-on-response nil
   "Callback for the in-flight query; see `magik-completion--cb-dispatch'.")
 
 (defvar-local magik-completion--cb-queue nil
-  "FIFO of (COMMAND READY-P PARSE-FN ON-RESPONSE) queries waiting
-behind the in-flight one on this connection.")
+  "FIFO of (COMMAND READY-P PARSE-FN ON-RESPONSE) queue.
+queries waiting behind the in-flight one on this connection.")
 
 (defvar-local magik-completion--cb-generation 0
   "Bumped on every dispatch; lets a timeout tell if it's stale.")
@@ -617,12 +610,8 @@ answer its first query while `method_finder' loads its database."
 
 (defun magik-completion--gis-session-idle-p (gis-buf)
   "Return non-nil if the session in GIS-BUF is idle at its prompt.
-Starting a CB connection blocks until the session answers, so check
-this first and skip the attempt while busy (e.g. mid-startup).  Checks
-up to the process mark rather than `point-max', so a command the user
-has typed but not yet submitted -- as when GIS-BUF is the very buffer
-completion was requested from -- isn't mistaken for the session being
-busy."
+Checked before starting a CB connection, since that blocks until
+the session answers."
   (with-current-buffer gis-buf
     (when-let* ((proc (get-buffer-process gis-buf))
                 (mark-pos (marker-position (process-mark proc))))
@@ -638,8 +627,7 @@ busy."
                       (>= (point) mark-pos)))))))))
 
 (defun magik-completion--ensure-cb-process ()
-  "Ensure a dedicated CB process is running; return it, or nil if it
-can't be started right now (including a busy session)."
+  "Ensure a dedicated CB process is running."
   (when (and magik-completion-enable-cb
              (require 'magik-cb nil t))
     (if (and magik-completion--cb-process
@@ -737,8 +725,8 @@ PARSE-FN override the default dispatch, see `magik-completion--cb-filter'."
                  #'magik-completion--cb-timeout buf generation)))
 
 (defun magik-completion--cb-timeout (buf generation)
-  "Give up on BUF's in-flight query if GENERATION is still current,
-restarting the connection so a late reply can't corrupt the next one."
+  "Give up on BUF's in-flight query if GENERATION is still current.
+Restart the connection so a late reply can't corrupt the next one."
   (when (buffer-live-p buf)
     (with-current-buffer buf
       (when (and (= generation magik-completion--cb-generation)
@@ -754,8 +742,8 @@ restarting the connection so a late reply can't corrupt the next one."
           (dolist (callback callbacks) (funcall callback nil)))))))
 
 (defun magik-completion--cb-deliver (result)
-  "Store RESULT as the in-flight query's outcome, notify its caller,
-then dispatch the next queued query on this connection, if any."
+  "Store RESULT as the in-flight query's outcome and notify its caller.
+Then dispatch the next queued query on this connection, if any."
   (setq magik-completion--cb-candidates result)
   (when-let* ((callback magik-completion--cb-on-response))
     (setq magik-completion--cb-on-response nil)
@@ -774,11 +762,11 @@ No-op unless Corfu popupinfo is the active frontend."
     (ignore-errors (corfu--post-command))))
 
 (defun magik-completion--cb-query-async (command callback &optional ready-p parse-fn no-refresh)
-  "Send COMMAND to the CB without blocking; return t if dispatched or
-queued, nil if no CB is available.  CALLBACK gets the result later.
-Unless NO-REFRESH (for doc-only fetches), completion is recomputed to
-show it; READY-P/PARSE-FN override the default dispatch, see
-`magik-completion--cb-filter'."
+  "Send COMMAND to the CB without blocking.
+Return t if dispatched or queued, nil if no CB is available; CALLBACK
+gets the result later.  Unless NO-REFRESH (for doc-only fetches),
+completion is recomputed to show it.  READY-P/PARSE-FN override the
+default dispatch, see `magik-completion--cb-filter'."
   (when-let* ((proc (magik-completion--ensure-cb-process))
               (buf (process-buffer proc))
               (_ (buffer-live-p buf)))
@@ -805,9 +793,10 @@ show it; READY-P/PARSE-FN override the default dispatch, see
     t))
 
 (defun magik-completion--cb-cached-fetch (cache-var loaded-var pending-var command)
-  "Return CACHE-VAR's value once LOADED-VAR is set, else fetch COMMAND
-in the background (unless PENDING-VAR is already set) and return nil.
-Args are variable symbols, not values, to drive several CB caches."
+  "Return CACHE-VAR's value once LOADED-VAR is set.
+Otherwise fetch COMMAND in the background (unless PENDING-VAR is
+already set) and return nil.  Args are variable symbols, not values,
+to drive several CB caches."
   (cond
    ((symbol-value loaded-var) (symbol-value cache-var))
    ((symbol-value pending-var) nil)
@@ -1002,8 +991,8 @@ Kicks off a background fetch and returns nil when not yet cached."
 ;;; --- CB queries ---
 
 (defun magik-completion--query-methods (class prefix)
-  "Return cached methods on CLASS starting with PREFIX, else fetch in
-the background and return nil."
+  "Return cached methods on CLASS starting with PREFIX.
+Otherwise fetch in the background and return nil."
   (let* ((char (if (string-empty-p prefix) "" (substring prefix 0 1)))
          (cache-key (concat class "." char)))
     (cond
@@ -1072,9 +1061,8 @@ Returns exemplar name string or nil."
          ((and magik-completion--class-cache
                (member variable magik-completion--class-cache))
           variable)
-         ;; Fallback: pass variable name directly to CB.
-         ;; The method_finder handles unknown classes gracefully
-         ;; and this covers globals like gis_program_manager.
+         ;; Fallback: pass the name straight to CB, which covers globals
+         ;; like gis_program_manager and handles unknown classes gracefully.
          (t variable))))))
 
 (defun magik-completion--infer-from-assignment (variable)
@@ -1190,9 +1178,7 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
            (optional-raw (get-text-property 0 'magik-optional candidate))
            (gather-raw (get-text-property 0 'magik-gather candidate))
            (optional (and magik-completion-insert-optional-params optional-raw))
-           ;; Only include gather when there are no skipped optional params
-           ;; before it: you can't pass gather args without first providing
-           ;; all positional optional args.
+           ;; Gather only valid if no optional params were skipped before it.
            (gather (and magik-completion-insert-gather-param
                         gather-raw
                         (or (null optional-raw) optional)
@@ -1226,12 +1212,9 @@ Returns a snippet string like \"(${1:arg1}, ${2:arg2})\" or nil."
 
 (defun magik-completion--qualified-class-name (candidate)
   "Return CANDIDATE qualified with its package, e.g. \"sw:rope\'.
-CANDIDATE may already be package-qualified, e.g. when it was
-produced by `magik-completion--package-agnostic-table' for a
-package-qualified prefix, in which case it's used as-is; otherwise
-this falls back to its `magik-package' text property.
-`get_class_info' requires a package-qualified class name; CANDIDATE
-alone (e.g. \"rope\') is not enough."
+If CANDIDATE is already package-qualified it's used as-is;
+otherwise this falls back to its `magik-package' text property.
+`get_class_info' requires a package-qualified class name."
   (cond
    ((string-match-p ":" candidate) candidate)
    ((get-text-property 0 'magik-package candidate)
@@ -1306,8 +1289,8 @@ global procedure, tagged `method'."
 QUALIFIABLE candidates (built-ins, classes, globals) also match
 package-qualified forms like \"sw:rope\" when the typed text has a
 `package:' qualifier, by generating qualified candidate strings on the
-fly (see `magik-completion--qualify-candidate'). PLAIN candidates
-(local variables, snippet keys) are never package-qualified."
+fly (see `magik-completion--qualify-candidate').  PLAIN candidates
+\(local variables, snippet keys) are never package-qualified."
   (lambda (string pred action)
     (complete-with-action
      action
@@ -1336,21 +1319,21 @@ fly (see `magik-completion--qualify-candidate'). PLAIN candidates
     ((or 'method 'variable) (magik-completion--doc-buffer candidate))))
 
 (defun magik-completion--symbol-exit-function (candidate status)
-  "Exit function for CANDIDATE based on its `magik-kind'."
+  "Exit function for CANDIDATE based on its `magik-kind'.
+STATUS is passed through to the kind-specific handler."
   (pcase (magik-completion--symbol-kind candidate)
     ('method (magik-completion--exit-function candidate status))
     ('snippet (magik-completion--snippet-exit-function candidate status))))
 
 (defun magik-completion-at-point-symbol ()
-  "Completion-at-point function for identifiers: keywords, built-ins,
-local variables, classes, global procedures/dynamics, and yasnippet
-template keys."
+  "Completion-at-point function for identifiers.
+Covers keywords, built-ins, local variables, classes, global
+procedures/dynamics, and yasnippet template keys."
   (when-let* ((bounds (magik-completion--bounds))
               (beg (car bounds))
               (end (cdr bounds))
-              ;; a `%name' character literal is handled exclusively by
-              ;; `magik-completion-at-point-character', not here; `@' is
-              ;; excluded outright
+              ;; `%name' is handled by `magik-completion-at-point-character';
+              ;; `@' is excluded outright.
               ((not (or (magik-completion--after-char-p beg ?%)
                         (magik-completion--after-char-p beg ?@))))
               (prefix (buffer-substring-no-properties beg end)))
@@ -1467,12 +1450,11 @@ Intended to be called after transmitting code to the session."
   (clrhash magik-completion--class-comment-cache))
 
 (defun magik-completion--reset-session-state (&rest _args)
-  "Invalidate caches, kill all dedicated completion CB buffers, and
-clear the dedicated-CB-connection state of every buffer with
-`magik-completion-mode' enabled.
-Called when a Magik session is killed or (re)started, so completion
-does not serve candidates -- or hang onto a dead connection -- from a
-previous session."
+  "Invalidate caches and kill all dedicated completion CB buffers.
+Also clears the dedicated-CB-connection state of every buffer with
+`magik-completion-mode' enabled.  Called when a Magik session is
+killed or (re)started, so completion doesn't serve stale candidates
+from a dead session."
   (magik-completion-invalidate-cache)
   (dolist (buf (buffer-list))
     (when (buffer-local-value 'magik-completion-mode buf)

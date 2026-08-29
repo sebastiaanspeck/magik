@@ -19,29 +19,29 @@ jobs:
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: DavidAnson/markdownlint-cli2-action@v24
+      - uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24
 
   codespell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: codespell-project/actions-codespell@v2
+      - uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2
         with:
           ignore_words_list: ans,ine,inh,isnt
 
   emacs-indentation-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: jcs090218/setup-emacs@v3
+      - uses: jcs090218/setup-emacs@ffd830bca5865932d99c3d179263d8b0ebdd00c0 # v3
         with:
           version: snapshot
 
-      - uses: emacs-eask/setup-eask@v3
+      - uses: emacs-eask/setup-eask@098ca9e1d90c188dbfee5c91688fbbaa930499b6 # v3
         with:
           version: snapshot
 
